@@ -47,6 +47,7 @@ StartGame
           sta CURRENT_DISPLAY_TEXT_POS
           sta GAME_PROGRESS
           sta ACTIVE_ITEM
+          sta PLAYER_KNEELING
 
           lda #100
           sta PLAYER_HEALTH
@@ -91,15 +92,154 @@ StartGame
 ;          sta PARAM3
 ;          jsr SpawnObject
 
+!ifdef SHOW_DEBUG_VALUES {
+          lda #1
+          sta SCREEN_COLOR + 13 * 40
+          sta SCREEN_COLOR + 13 * 40 + 1
+          sta SCREEN_COLOR + 13 * 40 + 2
+          sta SCREEN_COLOR + 13 * 40 + 3
+          sta SCREEN_COLOR + 13 * 40 + 4
+          sta SCREEN_COLOR + 13 * 40 + 5
+          sta SCREEN_COLOR + 13 * 40 + 6
+          sta SCREEN_COLOR + 13 * 40 + 7
+
+          sta SCREEN_COLOR + 13 * 40 + 10
+          sta SCREEN_COLOR + 13 * 40 + 10 + 1
+          sta SCREEN_COLOR + 13 * 40 + 10 + 2
+          sta SCREEN_COLOR + 13 * 40 + 10 + 3
+          sta SCREEN_COLOR + 13 * 40 + 10 + 4
+          sta SCREEN_COLOR + 13 * 40 + 10 + 5
+          sta SCREEN_COLOR + 13 * 40 + 10 + 6
+          sta SCREEN_COLOR + 13 * 40 + 10 + 7
+}
+
           lda #TEXT_INTRO
           jsr AddText
-
 
 
 !zone GameLoop
 GameLoop
           lda #150
           jsr WaitFrame
+
+!ifdef SHOW_DEBUG_VALUES {
+SPRITE_INDEX_TO_SHOW = 0
+
+          lda SPRITE_TILE_POS_X + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS
+          lda SPRITE_TILE_POS_X + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + 1
+
+          lda SPRITE_TILE_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + 2
+          lda SPRITE_TILE_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + 3
+
+          lda SPRITE_CHAR_POS_X + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + 4
+          lda SPRITE_CHAR_POS_X + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + 5
+
+          lda SPRITE_CHAR_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + 6
+          lda SPRITE_CHAR_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + 7
+
+SPRITE_INDEX_TO_SHOW = 2
+SHOW_X = 10
+
+          lda SPRITE_TILE_POS_X + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X
+          lda SPRITE_TILE_POS_X + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X + 1
+
+          lda SPRITE_TILE_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X + 2
+          lda SPRITE_TILE_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X + 3
+
+          lda SPRITE_CHAR_POS_X + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X + 4
+          lda SPRITE_CHAR_POS_X + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X + 5
+
+          lda SPRITE_CHAR_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          lsr
+          lsr
+          lsr
+          lsr
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X + 6
+          lda SPRITE_CHAR_POS_X_DELTA + SPRITE_INDEX_TO_SHOW
+          and #$0f
+          tay
+          lda HEX,y
+          sta SCREEN_PANEL_POS + SHOW_X + 7
+}
 
           jsr ObjectControl
 
@@ -112,7 +252,8 @@ GameLoop
           bne .NoMore
 
           lda ACTIVE_ENEMY_COUNT
-          cmp #4
+          ;cmp #4
+          cmp #1
           beq .NoMore
 
           jsr GenerateRandomNumber
@@ -129,6 +270,10 @@ GameLoop
 
           jmp .Spawned
 
+!ifdef SHOW_DEBUG_VALUES {
+HEX
+          !scr "0123456789abcdef"
+}
 
 
 .SpawnRight
@@ -460,13 +605,37 @@ ScrollRightToLeft
           jsr DrawColumn
 
           ;move sprites hard
-          ldx #2
+          ldx #0
 -
           lda SPRITE_ACTIVE,x
           beq .Skip1
 
-          inc SPRITE_CHAR_POS_X,x
+          ;lda SPRITE_TILE_POS_X_DELTA,x
+;          clc
+;          adc #8
+;          cmp #32
+;          bcc +
+;
+;          sec
+;          sbc #32
+;          inc SPRITE_TILE_POS_X,x
+;+
+;          sta SPRITE_TILE_POS_X_DELTA,x
 
+!if 0 {
+          lda SPRITE_CHAR_POS_X_DELTA,x
+          clc
+          adc #8
+          cmp #8
+          bcc +
+
+          sec
+          sbc #8
+          inc SPRITE_CHAR_POS_X,x
++
+          sta SPRITE_CHAR_POS_X_DELTA,x
+
+}
 .Skip1
           inx
           cpx #8
@@ -474,13 +643,13 @@ ScrollRightToLeft
 
 .NoHardScroll
           ;move sprites
-          ldx #2
+          ldx #0
           stx CURRENT_SUB_INDEX
 -
           lda SPRITE_ACTIVE,x
           beq .Skip
 
-          jsr ObjectMoveLeft
+          jsr ObjectShiftLeft
 .Skip
           lda CURRENT_SUB_INDEX
           clc
@@ -610,12 +779,36 @@ ScrollLeftToRight
           jsr DrawColumn
 
           ;move sprites hard
-          ldx #2
+          ldx #0
 -
           lda SPRITE_ACTIVE,x
           beq .Skip1
 
+          ;lda SPRITE_TILE_POS_X_DELTA,x
+;          sec
+;          sbc #8
+;          bpl +
+;
+;          dec SPRITE_TILE_POS_X,x
+;          clc
+;          adc #32
+;
+;+
+;          sta SPRITE_TILE_POS_X_DELTA,x
+
+!if 0 {
+          lda SPRITE_CHAR_POS_X_DELTA,x
+          sec
+          sbc #8
+          bpl +
+
           dec SPRITE_CHAR_POS_X,x
+          clc
+          adc #8
+
++
+          sta SPRITE_CHAR_POS_X_DELTA,x
+}
 
 .Skip1
           inx
@@ -624,13 +817,13 @@ ScrollLeftToRight
 
 .NoHardScroll
           ;move sprites
-          ldx #2
+          ldx #0
           stx CURRENT_SUB_INDEX
 -
           lda SPRITE_ACTIVE,x
           beq .Skip
 
-          jsr ObjectMoveRight
+          jsr ObjectShiftRight
 
 .Skip
           lda CURRENT_SUB_INDEX
@@ -819,9 +1012,8 @@ DrawColumn
 
 
 
-!zone SetupMapData
 ;y = map-index
-SetupMapData
+!lzone SetupMapData
           sty CURRENT_MAP_INDEX
 
           lda #0
@@ -830,8 +1022,10 @@ SetupMapData
 
           lda MAP_MAP_LIST_LO,y
           sta CURRENT_MAP_TILE_DATA
+          sta CURRENT_MAP_DATA
           lda MAP_MAP_LIST_HI,y
           sta CURRENT_MAP_TILE_DATA + 1
+          sta CURRENT_MAP_DATA + 1
 
           lda MAP_MAP_EXTRA_DATA_LIST_LO,y
           sta ZEROPAGE_POINTER_1
@@ -864,6 +1058,8 @@ SetupMapData
           ;exit x
           iny
           lda (ZEROPAGE_POINTER_1),y
+          sta PARAM3
+          and #$7f
           sta EXIT_X_POS,x
 
           ;exit target
@@ -876,6 +1072,18 @@ SetupMapData
           lda (ZEROPAGE_POINTER_1),y
           sta EXIT_TARGET_X_POS,x
 
+          lda #0
+          sta EXIT_KEY_OBJECT,x
+
+          ;key object?
+          lda PARAM3
+          bpl .NoLockedDoor
+
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          sta EXIT_KEY_OBJECT,x
+
+.NoLockedDoor
           inx
           dec PARAM2
           bne -
@@ -893,6 +1101,11 @@ SetupMapData
           iny
           lda (ZEROPAGE_POINTER_1),y
           sta MAP_OBJECT_X_POS,x
+
+          ;object type
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          sta MAP_OBJECT_TYPE,x
 
           ;object content
           iny
@@ -935,17 +1148,9 @@ SetupMapData
 
 
 
-!zone WalkInDoor
-WalkInDoor
-          ;calc tile index
-          lda X_OFFSET_INSIDE_TILE
-          clc
-          adc SPRITE_CHAR_POS_X
-          lsr
-          lsr
-          clc
-          adc X_OFFSET_TILE
-          sta PARAM1
+;y = tile x pos of door
+!lzone WalkInDoor
+          sty PARAM1
 
           ldy #0
           ;assume
@@ -964,18 +1169,53 @@ WalkInDoor
           cpy NUM_EXITS
           bne -
 
-          rts
+
+.ExitIsLocked
+          ;...or door is not properly configured!
+          lda #TEXT_DOOR_LOCKED
+          jmp AddText
+
+.CantOpen
+          lda #TEXT_DOESNT_WORK
+          jmp AddText
 
 .ThisExit
           ;exit index in y
+          lda EXIT_KEY_OBJECT,y
+          bmi .ExitIsLocked
+          beq .Opening
+          cmp ACTIVE_ITEM
+          beq .Opening
+
+          lda ACTIVE_ITEM
+          beq .ExitIsLocked
+          jmp .CantOpen
+
+.Opening
+          sty PARAM1
+          jsr OpenDoorAndWalkOut
+          ldy PARAM1
+
           lda EXIT_TARGET_MAP,y
           sta CURRENT_MAP_INDEX
 
           lda EXIT_TARGET_X_POS,y
+          sta OPEN_DOOR_X_POS
+          jsr SetupPlayerInMap
+
+          ldy #10
+-
+          jsr ObjectMoveUp
+          dey
+          bne -
+
+          jmp WalkOutAndCloseDoor
+
+
 
 ;a = target tile X
 ;map set in CURRENT_MAP_INDEX
-SetupPlayerInMap
+!lzone SetupPlayerInMap
           sta .PLAYER_TARGET_TILE
           sec
           sbc #5
@@ -1014,6 +1254,10 @@ SetupPlayerInMap
           lda #2
           sta SPRITE_COUNT
 
+          lda #16
+          sta SPRITE_TILE_POS_X_DELTA
+
+
           lda #10
           sta PARAM2
           lda #TYPE_PLAYER + 1
@@ -1021,11 +1265,190 @@ SetupPlayerInMap
           ldx #1
           jsr SpawnObjectInSlot
 
-
           rts
 
 
 
+;y, PARAM1 = exit index
+!lzone OpenDoorAndWalkOut
+          ;char index from tile
+          lda EXIT_X_POS,y
+          sec
+          sbc X_OFFSET_TILE
+          asl
+          asl
+          sec
+          sbc X_OFFSET_INSIDE_TILE
+          sta OPEN_DOOR_X_POS
+
+          ldy #0
+          sty DOOR_OPEN_DELAY
+          sty SPRITE_STATE_POS
+          sty DOOR_OPEN_POS
+
+          lda #1
+          sta SPRITE_STATE
+
+          lda OPEN_DOOR_TILE
+          cmp #18
+          bne +
+
+          ;it's a closed door, we need the open door anim
+          inc SPRITE_STATE_POS
+
++
+
+.OpenDoorLoop
+          lda #150
+          jsr WaitFrame
+
+          ldx #0
+          jsr BHPlayer
+
+          lda SPRITE_STATE
+          cmp #2
+          bne .OpenDoorLoop
+          rts
+
+
+!lzone WalkOutAndCloseDoor
+          ;char index from tile
+          lda OPEN_DOOR_X_POS
+          sec
+          sbc X_OFFSET_TILE
+          asl
+          asl
+          sec
+          sbc X_OFFSET_INSIDE_TILE
+          sta OPEN_DOOR_X_POS
+
+          lda #3
+          sta SPRITE_STATE
+
+          lda #85
+          sta SPRITE_POS_Y
+          lda #85 + 21
+          sta SPRITE_POS_Y + 1
+
+          lda #SPRITE_PLAYER_DOWN
+          sta SPRITE_IMAGE
+          lda #SPRITE_PLAYER_DOWN + 4
+          sta SPRITE_IMAGE + 1
+
+          ;inject open door!
+          ldy #4
+          lda DOOR_TOP_TILES,y
+          sta PARAM3
+
+          ldx OPEN_DOOR_X_POS
+          ldy #4
+          lda PARAM3
+          jsr DrawTile
+          ldx OPEN_DOOR_X_POS
+          ldy #6
+          lda PARAM3
+          clc
+          adc #1
+          jsr DrawTile
+          ldx OPEN_DOOR_X_POS
+          ldy #8
+          lda PARAM3
+          clc
+          adc #2
+          jsr DrawTile
+
+.CloseDoorLoop
+          lda #150
+          jsr WaitFrame
+
+          ldx #0
+          jsr BHPlayer
+
+          lda SPRITE_STATE
+          cmp #5
+          bne .CloseDoorLoop
+          rts
+
+
+DOOR_OPEN_POS
+          !byte 0
+DOOR_OPEN_DELAY
+          !byte 0
+
+DOOR_TOP_TILES
+          !byte 21      ;closed
+          !byte 25      ;opening 1
+          !byte 28      ;opening 2
+          !byte 31      ;opening 3
+          !byte 16      ;open
+
+
+;x,y = pos on screen
+;a = tile index
+!lzone DrawTile
+          pha
+
+          lda SCREEN_LINE_OFFSET_TABLE_LO,y
+          sta ZEROPAGE_POINTER_1
+          sta ZEROPAGE_POINTER_2
+          lda SCREEN_LINE_OFFSET_TABLE_HI,y
+          sta ZEROPAGE_POINTER_1 + 1
+          clc
+          adc #>( SCREEN_COLOR - SCREEN_CHAR )
+          sta ZEROPAGE_POINTER_2 + 1
+
+          txa
+          tay
+
+          pla
+          tax
+
+          lda MAP_TILE_CHARS_0_0,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_0_0,x
+          sta (ZEROPAGE_POINTER_2),y
+          iny
+          lda MAP_TILE_CHARS_1_0,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_1_0,x
+          sta (ZEROPAGE_POINTER_2),y
+          iny
+          lda MAP_TILE_CHARS_2_0,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_2_0,x
+          sta (ZEROPAGE_POINTER_2),y
+          iny
+          lda MAP_TILE_CHARS_3_0,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_3_0,x
+          sta (ZEROPAGE_POINTER_2),y
+
+          tya
+          clc
+          adc #37
+          tay
+
+          lda MAP_TILE_CHARS_0_1,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_0_1,x
+          sta (ZEROPAGE_POINTER_2),y
+          iny
+          lda MAP_TILE_CHARS_1_1,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_1_1,x
+          sta (ZEROPAGE_POINTER_2),y
+          iny
+          lda MAP_TILE_CHARS_2_1,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_2_1,x
+          sta (ZEROPAGE_POINTER_2),y
+          iny
+          lda MAP_TILE_CHARS_3_1,x
+          sta (ZEROPAGE_POINTER_1),y
+          lda MAP_TILE_COLORS_3_1,x
+          sta (ZEROPAGE_POINTER_2),y
+
+          rts
 
 
 NUM_EXITS
@@ -1040,6 +1463,8 @@ EXIT_TARGET_MAP
           !fill MAX_NUM_EXITS
 EXIT_TARGET_X_POS
           !fill MAX_NUM_EXITS
+EXIT_KEY_OBJECT
+          !fill MAX_NUM_EXITS
 
 MAP_OBJECT_X_POS
           !fill MAX_NUM_OBJECTS
@@ -1048,6 +1473,9 @@ MAP_OBJECT_X_POS
 MAP_OBJECT_CONTENT
           !fill MAX_NUM_OBJECTS
 
+;type of object
+MAP_OBJECT_TYPE
+          !fill MAX_NUM_OBJECTS
 
 X_OFFSET_TILE
           !byte 0
@@ -1055,8 +1483,12 @@ X_OFFSET_TILE
 X_OFFSET_INSIDE_TILE
           !byte 0
 
-;pointer to current map data
+;pointer to current map data (data of first visible column on screen)
 CURRENT_MAP_TILE_DATA
+          !word 0
+
+;pointer to current map data (data of left most column)
+CURRENT_MAP_DATA
           !word 0
 
 ;current map width in tiles
@@ -1085,20 +1517,51 @@ PLAYER_HEALTH
 PLAYER_ENERGY
           !word 0
 
+PLAYER_KNEELING
+          !byte 0
 
 MAP_OBJECT_NAME_LO
           !byte <MO_LOCKER
+          !byte <MO_POWER_OUTLET
 
 MAP_OBJECT_NAME_HI
           !byte >MO_LOCKER
+          !byte >MO_POWER_OUTLET
 
 MO_LOCKER
           !scr "locker",0
+
+MO_POWER_OUTLET
+          !scr "power outlet",0
+
+;tile index of detected door (18 or 23)
+OPEN_DOOR_TILE
+          !byte 0
+OPEN_DOOR_X_POS
+          !byte 0
 
 ;map object index behind player, $ff = none
 PLAYER_MAP_OBJECT
           !byte $ff
 
+MAP_OBJECT_ACTION_LO
+          !byte <PlayerSearchObject       ;locker
+          !byte <ChargeObject             ;locker
+
+MAP_OBJECT_ACTION_HI
+          !byte >PlayerSearchObject           ;locker
+          !byte >ChargeObject             ;locker
+
 ;0 = start, 1 = picked gun
 GAME_PROGRESS
           !byte 0
+
+MAP_DATA_OFFSET_LO
+!for COL = 0 to 31
+          !byte <( COL * 6 )
+!end
+
+MAP_DATA_OFFSET_HI
+!for COL = 0 to 31
+          !byte >( COL * 6 )
+!end

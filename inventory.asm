@@ -1,4 +1,4 @@
-NUM_KNOWN_ITEMS = 2
+NUM_KNOWN_ITEMS = 3
 
 ITEM_NONE         = 0
 ITEM_PISTOL       = 1
@@ -231,7 +231,7 @@ CURRENT_DISPLAY_TEXT
 CURRENT_DISPLAY_TEXT_POS
           !byte 0
 
-
+;active item (the actual item ID)
 ACTIVE_ITEM
           !byte 0
 
@@ -256,20 +256,32 @@ DISPLAY_TEXT_SHIFT_PAUSE
           !byte 0
 
 
-TEXT_FOUND_PISTOL   = 0
-TEXT_FOUND_NOTHING  = 1
-TEXT_INTRO          = 2
+TEXT_FOUND_PISTOL     = 0
+TEXT_FOUND_NOTHING    = 1
+TEXT_INTRO            = 2
+TEXT_FOUND_KEYCARD_A  = 3
+TEXT_DOOR_LOCKED      = 4
+TEXT_DOESNT_WORK      = 5
+TEXT_CHARGED          = 6
 
 
 TEXT_LO
           !byte <TX_FOUND_PISTOL
           !byte <TX_FOUND_NOTHING
           !byte <TX_INTRO
+          !byte <TX_FOUND_KEYCARD_A
+          !byte <TX_DOOR_LOCKED
+          !byte <TX_DOESNT_WORK
+          !byte <TX_CHARGED
 
 TEXT_HI
           !byte >TX_FOUND_PISTOL
           !byte >TX_FOUND_NOTHING
           !byte >TX_INTRO
+          !byte >TX_FOUND_KEYCARD_A
+          !byte >TX_DOOR_LOCKED
+          !byte >TX_DOESNT_WORK
+          !byte >TX_CHARGED
 
 
 TX_FOUND_PISTOL
@@ -280,3 +292,15 @@ TX_FOUND_NOTHING
 
 TX_INTRO
           !scr "ugh. my head!",0
+
+TX_FOUND_KEYCARD_A
+          !scr "your keycard",0
+
+TX_DOOR_LOCKED
+          !scr "it's locked!",0
+
+TX_DOESNT_WORK
+          !scr "that doesn't work!",0
+
+TX_CHARGED
+          !scr "it's charged",0

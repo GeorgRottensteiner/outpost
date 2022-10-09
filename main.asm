@@ -1,5 +1,7 @@
 ;wie dieses eine Immensity spiel, im gang hin und her rennen, rätsel lösen á Project Firestart?
 
+;SHOW_DEBUG_VALUES
+
 !src <c64.asm>
 
 SCREEN_CHAR             = $c000
@@ -8,7 +10,7 @@ SCREEN_COLOR            = $d800
 CHARSET_PANEL_LOCATION  = $f000
 CHARSET_LOCATION        = $f800
 
-NUM_SPRITES             = 58
+NUM_SPRITES             = 64
 
 JOY_BUTTON  = $10
 JOY_RIGHT   = $08

@@ -149,6 +149,16 @@ IrqPanelTop
           lda #( ( SCREEN_CHAR % 16384 ) / 1024 ) | ( ( CHARSET_PANEL_LOCATION % 16384 ) / 1024 )
           sta VIC.MEMORY_CONTROL
 
+          lda #$37
+          sta PROCESSOR_PORT
+
+          jsr KERNAL.SCNKEY
+          jsr KERNAL.GETIN
+          sta PRESSED_KEY
+
+          lda #$35
+          sta PROCESSOR_PORT
+
           pla
           tay
           pla
@@ -163,4 +173,7 @@ JOY_VALUE
           !byte 0
 
 JOY_RELEASED
+          !byte 0
+
+PRESSED_KEY
           !byte 0

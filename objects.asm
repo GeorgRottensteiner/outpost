@@ -11,6 +11,11 @@ SPRITE_BLOB             = SPRITE_BASE + 52
 SPRITE_PLAYER_HITBACK_L = SPRITE_BASE + 54
 SPRITE_PLAYER_HITBACK_R = SPRITE_BASE + 56
 
+SPRITE_PLAYER_KNEEL_R   = SPRITE_BASE + 58
+SPRITE_PLAYER_KNEEL_L   = SPRITE_BASE + 61
+SPRITE_PLAYER_UP        = SPRITE_BASE + 36
+SPRITE_PLAYER_DOWN      = SPRITE_BASE + 32
+
 TYPE_PLAYER             = 1
 TYPE_PLAYER_SHOT        = 3
 TYPE_EXPLOSION          = 4
@@ -49,7 +54,7 @@ RemoveAllObjects
 
 !zone ObjectMoveLeftBlocking
 ObjectMoveLeftBlocking
-          lda SPRITE_CHAR_POS_X_DELTA,x
+          lda SPRITE_TILE_POS_X_DELTA,x
           beq .CheckCanMoveLeft
 
 .CanMoveLeft
@@ -58,50 +63,22 @@ ObjectMoveLeftBlocking
           rts
 
 .CheckCanMoveLeft
-          lda SPRITE_CHAR_POS_X,x
-          beq .BlockedLeft
-
-          lda SPRITE_CHAR_POS_Y,x
-          sec
-          sbc SPRITE_HEIGHT_CHARS,x
-          bmi .BlockedLeft
-          tay
-          iny
-          lda SCREEN_LINE_OFFSET_TABLE_LO,y
+          ldy SPRITE_TILE_POS_X,x
+          dey
+          lda CURRENT_MAP_DATA
+          clc
+          adc MAP_DATA_OFFSET_LO,y
           sta ZEROPAGE_POINTER_1
-
-          lda SCREEN_LINE_OFFSET_TABLE_HI,y
+          lda CURRENT_MAP_DATA + 1
+          adc MAP_DATA_OFFSET_HI,y
           sta ZEROPAGE_POINTER_1 + 1
 
-          lda SPRITE_HEIGHT_CHARS,x
-          sta PARAM6
-
-          lda SPRITE_CHAR_POS_Y_DELTA,x
-          beq +
-          inc PARAM6
-+
-
---
-          ldy SPRITE_CHAR_POS_X,x
-          dey
-
+          ldy #4
           lda (ZEROPAGE_POINTER_1),y
-          jsr IsCharBlocking
-          bne .BlockedLeft
-
-          dec PARAM6
+          jsr IsTileBlocking
           beq .CanMoveLeft
 
-          lda ZEROPAGE_POINTER_1
-          clc
-          adc #40
-          sta ZEROPAGE_POINTER_1
-          bcc +
-          inc ZEROPAGE_POINTER_1 + 1
-+
-          jmp --
-
-.BlockedLeft
+          ;blocked
           lda #0
           rts
 
@@ -113,6 +90,44 @@ ObjectMoveLeftBlocking
 ;------------------------------------------------------------
 !zone ObjectMoveLeft
 ObjectMoveLeft
+
+          lda SPRITE_CHAR_POS_X_DELTA,x
+          bne .NoCharStep
+
+          lda #8
+          sta SPRITE_CHAR_POS_X_DELTA,x
+          dec SPRITE_CHAR_POS_X,x
+
+.NoCharStep
+          dec SPRITE_CHAR_POS_X_DELTA,x
+
+          lda SPRITE_TILE_POS_X_DELTA,x
+          bne .NoTileStep
+
+          lda #32
+          sta SPRITE_TILE_POS_X_DELTA,x
+          dec SPRITE_TILE_POS_X,x
+
+.NoTileStep
+          dec SPRITE_TILE_POS_X_DELTA,x
+
+          lda SPRITE_COUNT,x
+          sta PARAM12
+-
+          jsr MoveSpriteLeft
+
+          dec PARAM12
+          beq .Done
+          inx
+          jmp -
+
+.Done
+          ldx CURRENT_INDEX
+          rts
+
+
+!zone ObjectShiftLeft
+ObjectShiftLeft
 
           lda SPRITE_CHAR_POS_X_DELTA,x
           bne .NoCharStep
@@ -155,6 +170,35 @@ MoveSpriteLeft
           sta SPRITE_POS_X_EXTEND
 
 .NoChangeInExtendedFlag
+          ;going outside left?
+          lda SPRITE_CHAR_POS_X,x
+          bmi .Disable
+
+          cmp #39
+          beq .ComingInFromRight
+          bcs .Disable
+          bne .PlainEnable
+
+.ComingInFromRight
+          ;extended x
+          lda BIT_TABLE,x
+          ora SPRITE_POS_X_EXTEND
+          sta SPRITE_POS_X_EXTEND
+
+.PlainEnable
+          ;enable
+          lda BIT_TABLE,x
+          ora VIC.SPRITE_ENABLE
+          sta VIC.SPRITE_ENABLE
+          jmp .Enabled
+
+.Disable
+          lda BIT_TABLE,x
+          eor #$ff
+          and VIC.SPRITE_ENABLE
+          sta VIC.SPRITE_ENABLE
+
+.Enabled
           dec SPRITE_POS_X,x
           rts
 
@@ -164,7 +208,8 @@ MoveSpriteLeft
 ;retuens a = 1 if moved, 0 if blocked
 !zone ObjectMoveRightBlocking
 ObjectMoveRightBlocking
-          lda SPRITE_CHAR_POS_X_DELTA,x
+          lda SPRITE_TILE_POS_X_DELTA,x
+          cmp #16
           beq .CheckCanMoveRight
 
 .CanMoveRight
@@ -173,52 +218,22 @@ ObjectMoveRightBlocking
           rts
 
 .CheckCanMoveRight
-          lda SPRITE_CHAR_POS_X,x
-          cmp #39
-          beq .BlockedRight
-
-          lda SPRITE_CHAR_POS_Y,x
-          sec
-          sbc SPRITE_HEIGHT_CHARS,x
-          bmi .BlockedRight
-          tay
+          ldy SPRITE_TILE_POS_X,x
           iny
-          lda SCREEN_LINE_OFFSET_TABLE_LO,y
+          lda CURRENT_MAP_DATA
+          clc
+          adc MAP_DATA_OFFSET_LO,y
           sta ZEROPAGE_POINTER_1
-          lda SCREEN_LINE_OFFSET_TABLE_HI,y
+          lda CURRENT_MAP_DATA + 1
+          adc MAP_DATA_OFFSET_HI,y
           sta ZEROPAGE_POINTER_1 + 1
 
-          lda SPRITE_HEIGHT_CHARS,x
-          sta PARAM6
-
-          lda SPRITE_CHAR_POS_Y_DELTA,x
-          beq +
-          inc PARAM6
-+
-
---
-          lda SPRITE_CHAR_POS_X,x
-          clc
-          adc SPRITE_WIDTH_CHARS,x
-          tay
-
+          ldy #4
           lda (ZEROPAGE_POINTER_1),y
-          jsr IsCharBlocking
-          bne .BlockedRight
-
-          dec PARAM6
+          jsr IsTileBlocking
           beq .CanMoveRight
 
-          lda ZEROPAGE_POINTER_1
-          clc
-          adc #40
-          sta ZEROPAGE_POINTER_1
-          bcc +
-          inc ZEROPAGE_POINTER_1 + 1
-+
-          jmp --
-
-.BlockedRight
+          ;blocked
           lda #0
           rts
 
@@ -230,6 +245,45 @@ ObjectMoveRightBlocking
 ;------------------------------------------------------------
 !zone ObjectMoveRight
 ObjectMoveRight
+          inc SPRITE_CHAR_POS_X_DELTA,x
+
+          lda SPRITE_CHAR_POS_X_DELTA,x
+          cmp #8
+          bne .NoCharStep
+
+          lda #0
+          sta SPRITE_CHAR_POS_X_DELTA,x
+          inc SPRITE_CHAR_POS_X,x
+
+.NoCharStep
+          inc SPRITE_TILE_POS_X_DELTA,x
+
+          lda SPRITE_TILE_POS_X_DELTA,x
+          cmp #32
+          bne .NoTileStep
+
+          lda #0
+          sta SPRITE_TILE_POS_X_DELTA,x
+          inc SPRITE_TILE_POS_X,x
+.NoTileStep
+
+          lda SPRITE_COUNT,x
+          sta PARAM12
+-
+          jsr MoveSpriteRight
+
+          dec PARAM12
+          beq .Done
+          inx
+          jmp -
+
+.Done
+          ldx CURRENT_INDEX
+          rts
+
+
+
+!lzone ObjectShiftRight
           inc SPRITE_CHAR_POS_X_DELTA,x
 
           lda SPRITE_CHAR_POS_X_DELTA,x
@@ -256,7 +310,6 @@ ObjectMoveRight
           rts
 
 
-
 ;------------------------------------------------------------
 ;Move Sprite Right
 ;expect x as sprite index (0 to 7)
@@ -272,6 +325,35 @@ MoveSpriteRight
           sta SPRITE_POS_X_EXTEND
 
 .NoChangeInExtendedFlag
+          ;going outside left?
+          lda SPRITE_CHAR_POS_X,x
+          bmi .Disable
+
+          cmp #39
+          bcs .Disable
+
+          ;enable
+          lda BIT_TABLE,x
+          ora VIC.SPRITE_ENABLE
+          sta VIC.SPRITE_ENABLE
+
+          lda SPRITE_CHAR_POS_X,x
+          bne .Enabled
+
+          lda BIT_TABLE,x
+          eor #$ff
+          and SPRITE_POS_X_EXTEND
+          sta SPRITE_POS_X_EXTEND
+
+          jmp .Enabled
+
+.Disable
+          lda BIT_TABLE,x
+          eor #$ff
+          and VIC.SPRITE_ENABLE
+          sta VIC.SPRITE_ENABLE
+
+.Enabled
           rts
 
 
@@ -529,19 +611,11 @@ IsCharBlocking
 
 
 
-!zone IsCharBlockingD
-IsCharBlockingD
-          cmp #80
-          bcc .NotBlocking
+!zone IsTileBlocking
+IsTileBlocking
+          cmp #14
+          bne .NotBlocking
 
-          ;platforms and ladders
-          cmp #224
-          bcs .Blocking
-
-          cmp #220
-          bcs .NotBlocking
-
-.Blocking
           lda #1
           rts
 
@@ -672,8 +746,88 @@ BHPlayerShot
 
 
 
-!zone BHBlob
-BHBlob
+;state = 0 > fly left/right (towards player)
+;      = 1 > swarm over player
+!lzone BHBlob
+          inc SPRITE_ANIM_DELAY,x
+          lda SPRITE_ANIM_DELAY,x
+          and #$03
+          bne +
+          lda SPRITE_IMAGE,x
+          eor #$01
+          sta SPRITE_IMAGE,x
++
+
+          inc SPRITE_MOVE_POS,x
+          lda SPRITE_MOVE_POS,x
+          and #$0f
+          tay
+          lda BLOB_DELTA_Y,y
+          beq .NoDeltaY
+          sta PARAM2
+          bmi .GoUp
+
+          ;go down
+-
+          jsr ObjectMoveDown
+          dec PARAM2
+          bne -
+          jmp .NoDeltaY
+
+.GoUp
+-
+          jsr ObjectMoveUp
+          inc PARAM2
+          bne -
+
+.NoDeltaY
+          lda SPRITE_STATE,x
+          cmp #$80
+          bne .NoCooldown
+
+          lda SPRITE_STATE_POS,x
+          beq .NoUpdate
+          dec SPRITE_STATE_POS,x
+          bne .NoUpdate
+
+          ;collidable again
+          lda #0
+          sta SPRITE_STATE,x
+
+.NoUpdate
+.NoCooldown
+          lda SPRITE_STATE,x
+          and #$7f
+          beq .PlainMovement
+
+          inc SPRITE_STATE_POS,x
+          lda SPRITE_STATE_POS,x
+          cmp #10
+          bne +
+
+          ;revert to movement
+          lda #$80
+          sta SPRITE_STATE,x
+
+          ;and turn over
+          jmp .Blocked
+
++
+
+          ;still try to follow the player
+          lda SPRITE_CHAR_POS_X
+          cmp SPRITE_CHAR_POS_X,x
+          beq .WereGood
+          bcc .GoLeft
+          jmp ObjectMoveRightBlocking
+
+.GoLeft
+          jsr ObjectMoveLeftBlocking
+
+.WereGood
+          rts
+
+.PlainMovement
           lda #3
           sta PARAM2
 
@@ -687,8 +841,6 @@ BHBlob
           dec PARAM2
           bne .GoL
 
-          lda SPRITE_CHAR_POS_X,x
-          bmi .Outside
           rts
 
 
@@ -699,22 +851,20 @@ BHBlob
           dec PARAM2
           bne .GoR
 
-          lda SPRITE_CHAR_POS_X,x
-          cmp #39
-          bcs .Outside
           rts
-
-.Outside
-          dec ACTIVE_ENEMY_COUNT
-          jmp RemoveObject
-
-
 
 .Blocked
           lda SPRITE_DIRECTION,x
           eor #$01
           sta SPRITE_DIRECTION,x
           rts
+
+
+
+BLOB_DELTA_Y
+          !byte $03,$02,$01,$00,$ff,$fe,$fd
+          !byte $fd,$fd,$fe,$ff,$00,$01,$02
+          !byte $03,$03
 
 
 
@@ -778,8 +928,7 @@ ObjectControl
 ;      130: dying animation falling down
 ;------------------------------------------------------------
 
-!zone BHPlayer
-BHPlayer
+!lzone BHPlayer
           lda SPRITE_HIT_BACK
           beq .NoHitBack
 
@@ -819,9 +968,157 @@ BHPlayer
 .Scrolled2B
           jmp .UpdateMapObjectUnderPlayer
 
+.DoorHandlingDone
+          rts
 
 .NoHitBack
+          lda SPRITE_STATE
+          cmp #4
+          bne .NotClosingDoor
 
+          ;closing door
+          inc DOOR_OPEN_DELAY
+          lda DOOR_OPEN_DELAY
+          and #$01
+          bne .DoorHandlingDone
+
+          ldy DOOR_OPEN_POS
+          lda DOOR_TOP_TILES,y
+          sta PARAM3
+
+          ldx OPEN_DOOR_X_POS
+          ldy #4
+          lda PARAM3
+          jsr DrawTile
+          ldx OPEN_DOOR_X_POS
+          ldy #6
+          lda PARAM3
+          clc
+          adc #1
+          jsr DrawTile
+          ldx OPEN_DOOR_X_POS
+          ldy #8
+          lda PARAM3
+          clc
+          adc #2
+          jsr DrawTile
+
+          dec DOOR_OPEN_POS
+          bmi .DoorHandlingDone3
+          rts
+
+.DoorHandlingDone3
+          ;door is open
+          inc SPRITE_STATE
+          rts
+
+.NotClosingDoor
+          cmp #3
+          bne .NotWalkingOut
+
+          inc SPRITE_ANIM_POS
+          lda SPRITE_ANIM_POS
+          lsr
+          and #$03
+          clc
+          adc #SPRITE_PLAYER_DOWN
+          sta SPRITE_IMAGE
+          clc
+          adc #8
+          sta SPRITE_IMAGE + 1
+
+          jsr ObjectMoveDown
+
+          lda SPRITE_POS_Y
+          cmp #95
+          bne .DoorHandlingDone
+
+          lda OPEN_DOOR_TILE
+          cmp #23
+          beq .CloseDoor
+          inc SPRITE_STATE
+.CloseDoor
+          inc SPRITE_STATE
+          lda #4
+          sta DOOR_OPEN_POS
+          rts
+
+.NotWalkingOut
+          cmp #1
+          bne .NoDoor
+
+          lda SPRITE_STATE_POS
+          beq .OpeningDoor
+          cmp #1
+          bne .NotWalkingUp
+
+          inc SPRITE_ANIM_POS
+          lda SPRITE_ANIM_POS
+          lsr
+          and #$03
+          clc
+          adc #SPRITE_PLAYER_UP
+          sta SPRITE_IMAGE
+          clc
+          adc #8
+          sta SPRITE_IMAGE + 1
+
+          jsr ObjectMoveUp
+
+          lda SPRITE_POS_Y
+          cmp #85
+          bne .DoorHandlingDone2
+
+          inc SPRITE_STATE
+
+.NotWalkingUp
+          jmp .DoorHandlingDone
+
+.OpeningDoor
+          inc DOOR_OPEN_DELAY
+          lda DOOR_OPEN_DELAY
+          and #$01
+          bne .DoorHandlingDone2
+
+          ldy DOOR_OPEN_POS
+          lda DOOR_TOP_TILES,y
+          sta PARAM3
+
+          ldx OPEN_DOOR_X_POS
+          ldy #4
+          lda PARAM3
+          jsr DrawTile
+          ldx OPEN_DOOR_X_POS
+          ldy #6
+          lda PARAM3
+          clc
+          adc #1
+          jsr DrawTile
+          ldx OPEN_DOOR_X_POS
+          ldy #8
+          lda PARAM3
+          clc
+          adc #2
+          jsr DrawTile
+
+          inc DOOR_OPEN_POS
+          lda DOOR_OPEN_POS
+          cmp #5
+          bne .DoorHandlingDone2
+
+          inc SPRITE_STATE_POS
+          lda #SPRITE_PLAYER_UP
+          sta SPRITE_IMAGE
+          lda #SPRITE_PLAYER_UP + 4
+          sta SPRITE_IMAGE + 1
+
+          jmp .DoorHandlingDone
+
+.DoorHandlingDone2
+          rts
+
+
+.NoDoor
           jsr CheckCollisions
           bcc .NotColliding
 
@@ -835,6 +1132,16 @@ BHPlayer
           ;enemy hit us
           lda #15
           sta SPRITE_HIT_BACK
+
+          ;mark enemy as homed in
+          ldy PARAM3
+          lda SPRITE_STATE,y
+          bne .AlreadyHoming
+          lda #$81
+          sta SPRITE_STATE,y
+          lda #0
+          sta SPRITE_STATE_POS,x
+.AlreadyHoming
 
           ldy SPRITE_DIRECTION
           lda PLAYER_HITBACK_SPRITE,y
@@ -853,6 +1160,17 @@ BHPlayer
           rts
 
 .NotColliding
+          lda #0
+          sta PLAYER_KNEELING
+
+          lda #JOY_DOWN
+          and JOY_VALUE
+          bne .NotDown
+
+          inc PLAYER_KNEELING
+
+.NotDown
+
 
           lda #JOY_BUTTON
           jsr JoyReleasedControlPressed
@@ -881,23 +1199,46 @@ BHPlayer
           jsr DecreaseValue
 
 
-          lda SPRITE_CHAR_POS_X
+          lda SPRITE_TILE_POS_X
+          sec
+          sbc X_OFFSET_TILE
+          asl
+          asl
+          clc
           sta PARAM1
+
+          ;add on offset of player
+          lda SPRITE_TILE_POS_X_DELTA
+          lsr
+          lsr
+          lsr
+          clc
+          adc PARAM1
+          sta PARAM1
+
+
           lda SPRITE_CHAR_POS_Y
           sta PARAM2
+          lda PLAYER_KNEELING
+          beq .NotKneeling
+          inc PARAM2
+.NotKneeling
           lda #TYPE_PLAYER_SHOT
           sta PARAM3
           jsr SpawnObject
+
           lda SPRITE_DIRECTION
           sta SPRITE_DIRECTION,x
+          lda SPRITE_TILE_POS_X_DELTA
+          sta SPRITE_TILE_POS_X_DELTA,x
 
           ldx #0
 
 
 +
-          ;toggle items
-          lda #JOY_DOWN
-          jsr JoyReleasedControlPressed
+          ;toggle items (space)
+          lda PRESSED_KEY
+          cmp #32
           bne +
 
           ldx ACTIVE_ITEM
@@ -905,6 +1246,7 @@ BHPlayer
           inx
           cpx #NUM_KNOWN_ITEMS
           bne .XOk
+
           ldx #0
 .XOk
           stx ACTIVE_ITEM
@@ -924,29 +1266,51 @@ BHPlayer
           sta PLAYER_CARRIES_GUN
 +
           ldx #0
+          stx CURRENT_INDEX
 
           ;search/enter
           lda #JOY_UP
           jsr JoyReleasedControlPressed
           bne +
 
-          lda PLAYER_MAP_OBJECT
+          ldy PLAYER_MAP_OBJECT
           bmi .NotInFrontOfObject
 
-          jmp PlayerSearchObject
+          lda MAP_OBJECT_TYPE,y
+          tay
+
+          lda MAP_OBJECT_ACTION_LO,y
+          sta .MapObjectAction
+          lda MAP_OBJECT_ACTION_HI,y
+          sta .MapObjectAction + 1
+
+.MapObjectAction = * + 1
+          jmp $ffff
 
 .NotInFrontOfObject
           ;in front of door?
-          lda SCREEN_LINE_OFFSET_TABLE_LO + 9
+          ldy SPRITE_TILE_POS_X,x
+          lda CURRENT_MAP_DATA
+          clc
+          adc MAP_DATA_OFFSET_LO,y
           sta ZEROPAGE_POINTER_1
-          lda SCREEN_LINE_OFFSET_TABLE_HI + 9
+          lda CURRENT_MAP_DATA + 1
+          adc MAP_DATA_OFFSET_HI,y
           sta ZEROPAGE_POINTER_1 + 1
-          ldy SPRITE_CHAR_POS_X
+
+          ldy #4
           lda (ZEROPAGE_POINTER_1),y
-          cmp #81
+          cmp #18
+          beq .OpenDoor
+          cmp #23
           bne +
 
+          ;closed/locked door
+
+.OpenDoor
           ;walk in door
+          sta OPEN_DOOR_TILE
+          ldy SPRITE_TILE_POS_X,x
           jsr WalkInDoor
 
           jmp .UpdateMapObjectUnderPlayer
@@ -959,24 +1323,36 @@ BHPlayer
           lda #0
           sta SPRITE_DIRECTION
 
+          lda PLAYER_KNEELING
+          bne .NoMovingR
+
           inc SPRITE_MOVE_POS
 
+          lda #2
+          sta PARAM10
+
+--
           lda SPRITE_POS_X
           cmp #168
           bcc .MoveRight
-          ;inc VIC.BORDER_COLOR
+
+          ;if scrolled we also need to add up tile_pos_x_delta (and char_pos_x_delta?)
+          jsr ObjectMoveRightBlocking
+          beq .BlockedR
           jsr ScrollRightToLeft
-          jsr ScrollRightToLeft
-          beq .Scrolled
+          jmp .Scrolled
 
 .MoveRight
           jsr ObjectMoveRightBlocking
-          jsr ObjectMoveRightBlocking
-          ;dec VIC.BORDER_COLOR
 
 .Scrolled
+          dec PARAM10
+          bne --
+
+.BlockedR
           jsr .UpdateMapObjectUnderPlayer
 
+.NoMovingR
 .NotR
           lda #JOY_LEFT
           and JOY_VALUE
@@ -985,8 +1361,15 @@ BHPlayer
           lda #1
           sta SPRITE_DIRECTION
 
+          lda PLAYER_KNEELING
+          bne .NoMovingL
+
           inc SPRITE_MOVE_POS
 
+          lda #2
+          sta PARAM10
+
+--
           lda SPRITE_POS_X_EXTEND
           and #$01
           bne .MoveLeft
@@ -994,21 +1377,45 @@ BHPlayer
           cmp #168
           bcs .MoveLeft
 
-          ;inc VIC.BORDER_COLOR
+          ;if scrolled we also need to add up tile_pos_x_delta (and char_pos_x_delta?)
+          jsr ObjectMoveLeftBlocking
+          beq .BlockedL
           jsr ScrollLeftToRight
-          jsr ScrollLeftToRight
-          beq .Scrolled2
+          jmp .Scrolled2
 
 .MoveLeft
           jsr ObjectMoveLeftBlocking
-          jsr ObjectMoveLeftBlocking
-          ;dec VIC.BORDER_COLOR
 
 .Scrolled2
+          dec PARAM10
+          bne --
+
+.BlockedL
           jsr .UpdateMapObjectUnderPlayer
+
+.NoMovingL
 .NotL
           ;update sprite
           ldy SPRITE_DIRECTION
+          lda PLAYER_KNEELING
+          beq .NoKneeling
+
+          lda PLAYER_SPRITE_KNEEL,y
+          sta SPRITE_IMAGE
+          clc
+          adc #1
+          sta SPRITE_IMAGE + 1
+
+          lda PLAYER_CARRIES_GUN
+          beq +
+
+          inc SPRITE_IMAGE + 1
+
++
+          rts
+
+.NoKneeling
+
           lda SPRITE_MOVE_POS
           lsr
           lsr
@@ -1023,16 +1430,20 @@ BHPlayer
 
           rts
 
+PLAYER_SPRITE_KNEEL
+          !byte SPRITE_PLAYER_KNEEL_R
+          !byte SPRITE_PLAYER_KNEEL_L
 
 .UpdateMapObjectUnderPlayer
-          ;calc tile index
-          lda X_OFFSET_INSIDE_TILE
-          clc
-          adc SPRITE_CHAR_POS_X
-          lsr
-          lsr
-          clc
-          adc X_OFFSET_TILE
+          ;;calc tile index
+          ;lda X_OFFSET_INSIDE_TILE
+          ;clc
+          ;adc SPRITE_CHAR_POS_X
+          ;lsr
+          ;lsr
+          ;clc
+          ;adc X_OFFSET_TILE
+          lda SPRITE_TILE_POS_X
           sta PARAM1
 
           ldy #0
@@ -1069,6 +1480,8 @@ BHPlayer
           sty PLAYER_MAP_OBJECT
 
           ;update display
+          lda MAP_OBJECT_TYPE,y
+          tay
           lda MAP_OBJECT_NAME_LO,y
           sta ZEROPAGE_POINTER_1
           lda MAP_OBJECT_NAME_HI,y
@@ -1104,6 +1517,29 @@ BHPlayer
           rts
 
 
+;PLAYER_MAP_OBJECT  = object on map (charger)
+;ACTIVE_ITEM        = Item in Hand
+!lzone ChargeObject
+          lda ACTIVE_ITEM
+          cmp #ITEM_PISTOL
+          bne .DoesntWork
+
+          lda #100
+          sta PLAYER_ENERGY
+
+          lda #'1'
+          sta SCREEN_PANEL_POS + $112
+          lda #'0'
+          sta SCREEN_PANEL_POS + $112 + 1
+          sta SCREEN_PANEL_POS + $112 + 2
+
+          lda #TEXT_CHARGED
+          jmp AddText
+
+
+.DoesntWork
+          lda #TEXT_DOESNT_WORK
+          jmp AddText
 
 !lzone PlayerSearchObject
           ldy PLAYER_MAP_OBJECT
@@ -1119,6 +1555,8 @@ BHPlayer
 
           cpy #ITEM_PISTOL
           beq .Gun
+          cpy #ITEM_KEYCARD_A
+          beq .Keycard
 
           jmp .Empty
 
@@ -1128,14 +1566,14 @@ BHPlayer
 
           jsr DisplayInventory
 
-          ldx #3
-          ldy #14
-          lda #0
-          jsr DrawItem
-
           lda #TEXT_FOUND_PISTOL
           jmp AddText
 
+.Keycard
+          jsr DisplayInventory
+
+          lda #TEXT_FOUND_KEYCARD_A
+          jmp AddText
 
 .Empty
           lda #TEXT_FOUND_NOTHING
@@ -1211,10 +1649,6 @@ CheckCollisions
 
 
 
-;check object collision with other objects
-;CURRENT_INDEX is current object
-;CURRENT_SUB_INDEX is other object)
-;return a = 1 when colliding, a = 0 when not
 !zone IsObjectCollidingWithObject
 .CalculateSimpleXPos
           ;Returns a with simple x pos (x halved + 128 if > 256)
@@ -1234,8 +1668,21 @@ CheckCollisions
           lsr
           rts
 
+;check object collision with other objects
+;CURRENT_INDEX is current object
+;CURRENT_SUB_INDEX is other object
+;return a = 1 when colliding, a = 0 when not
 IsObjectCollidingWithObject
+          ldx CURRENT_INDEX
+          lda BIT_TABLE,x
+          and VIC.SPRITE_ENABLE
+          beq .NotTouching
+
           ldx CURRENT_SUB_INDEX
+          lda BIT_TABLE,x
+          and VIC.SPRITE_ENABLE
+          beq .NotTouching
+
           lda SPRITE_HEIGHT_CHARS,x
           asl
           asl
@@ -1315,11 +1762,17 @@ SpawnObjectInSlot
           ;PARAM1 and PARAM2 hold x,y already
           jsr CalcSpritePosFromCharPos
 
+          lda SPRITE_CHAR_POS_X,x
+          bmi .Outside
+          cmp #39
+          bcs .Outside
+
           ;enable sprite
           lda BIT_TABLE,x
           ora VIC.SPRITE_ENABLE
           sta VIC.SPRITE_ENABLE
 
+.Outside
           lda PARAM3
 ;x = slot, a = new type
 SetupSpriteInSlot
@@ -1364,6 +1817,17 @@ SetupSpriteInSlot
           sta SPRITE_HIT_BACK,x
           sta SPRITE_DAMAGE,x
           sta SPRITE_SECTOR,x
+          sta SPRITE_TILE_POS_X_DELTA,x
+
+          ;calc tile pos
+          lda X_OFFSET_INSIDE_TILE
+          clc
+          adc SPRITE_CHAR_POS_X,x
+          lsr
+          lsr
+          clc
+          adc X_OFFSET_TILE
+          sta SPRITE_TILE_POS_X,x
 
           lda TYPE_START_STATE,y
           sta SPRITE_STATE,x
@@ -1533,6 +1997,10 @@ SPRITE_CHAR_POS_X
           !byte 0,0,0,0,0,0,0,0
 SPRITE_CHAR_POS_X_DELTA
           !byte 0,0,0,0,0,0,0,0
+SPRITE_TILE_POS_X
+          !byte 0,0,0,0,0,0,0,0
+SPRITE_TILE_POS_X_DELTA
+          !byte 0,0,0,0,0,0,0,0
 SPRITE_CHAR_POS_Y
           !byte 0,0,0,0,0,0,0,0
 SPRITE_CHAR_POS_Y_DELTA
@@ -1541,8 +2009,6 @@ SPRITE_POS_Y
           !byte 0,0,0,0,0,0,0,0
 SPRITE_ACTIVE
           !byte 0,0,0,0,0,0,0,0
-SPRITE_TILE_POS
-          !fill NUM_SPRITE_SLOTS
 SPRITE_DAMAGE
           !fill NUM_SPRITE_SLOTS
 SPRITE_HIT_BACK
@@ -1577,7 +2043,6 @@ SPRITE_MAIN_INDEX
           !fill 8
 SPRITE_COUNT
           !fill 8,1
-
 
 
 TYPE_START_SPRITE = * - 1
