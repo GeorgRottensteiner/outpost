@@ -51,6 +51,14 @@ IrqTop
           ora SCROLL_OFFSET_X
           sta VIC.CONTROL_2
 
+          lda #$0b
+          ora TOP_SCREEN_ACTIVE
+          sta VIC.CONTROL_1
+
+          lda SPRITES_ENABLED
+          sta VIC.SPRITE_ENABLE
+
+
           lda #<IrqBelowGameField
           sta KERNAL_IRQ_LO
           lda #>IrqBelowGameField
@@ -99,6 +107,9 @@ IrqBelowGameField
           pha
           tya
           pha
+
+          lda #$1b
+          sta VIC.CONTROL_1
 
           lda #154
           sta VIC.RASTER_POS
@@ -169,6 +180,30 @@ IrqPanelTop
 
 
 
+;a = char pos (on screen)
+;returns a = tile pos
+!lzone CalcTilePosFromCharPos
+          clc
+          adc X_OFFSET_INSIDE_TILE
+          lsr
+          lsr
+          clc
+          adc X_OFFSET_TILE
+          rts
+
+
+
+;char index from tile
+!lzone CalcCharPosFromTilePos
+          sec
+          sbc X_OFFSET_TILE
+          asl
+          asl
+          sec
+          sbc X_OFFSET_INSIDE_TILE
+          rts
+
+
 JOY_VALUE
           !byte 0
 
@@ -177,3 +212,7 @@ JOY_RELEASED
 
 PRESSED_KEY
           !byte 0
+
+;$10 = active, 0 = disabled
+TOP_SCREEN_ACTIVE
+          !byte $10

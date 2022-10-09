@@ -41,7 +41,7 @@ RemoveAllObjects
           cpx #8
           bne -
 
-          sta VIC.SPRITE_ENABLE
+          sta SPRITES_ENABLED
           sta ACTIVE_ENEMY_COUNT
           rts
 
@@ -188,15 +188,15 @@ MoveSpriteLeft
 .PlainEnable
           ;enable
           lda BIT_TABLE,x
-          ora VIC.SPRITE_ENABLE
-          sta VIC.SPRITE_ENABLE
+          ora SPRITES_ENABLED
+          sta SPRITES_ENABLED
           jmp .Enabled
 
 .Disable
           lda BIT_TABLE,x
           eor #$ff
-          and VIC.SPRITE_ENABLE
-          sta VIC.SPRITE_ENABLE
+          and SPRITES_ENABLED
+          sta SPRITES_ENABLED
 
 .Enabled
           dec SPRITE_POS_X,x
@@ -334,8 +334,8 @@ MoveSpriteRight
 
           ;enable
           lda BIT_TABLE,x
-          ora VIC.SPRITE_ENABLE
-          sta VIC.SPRITE_ENABLE
+          ora SPRITES_ENABLED
+          sta SPRITES_ENABLED
 
           lda SPRITE_CHAR_POS_X,x
           bne .Enabled
@@ -350,8 +350,8 @@ MoveSpriteRight
 .Disable
           lda BIT_TABLE,x
           eor #$ff
-          and VIC.SPRITE_ENABLE
-          sta VIC.SPRITE_ENABLE
+          and SPRITES_ENABLED
+          sta SPRITES_ENABLED
 
 .Enabled
           rts
@@ -1435,14 +1435,6 @@ PLAYER_SPRITE_KNEEL
           !byte SPRITE_PLAYER_KNEEL_L
 
 .UpdateMapObjectUnderPlayer
-          ;;calc tile index
-          ;lda X_OFFSET_INSIDE_TILE
-          ;clc
-          ;adc SPRITE_CHAR_POS_X
-          ;lsr
-          ;lsr
-          ;clc
-          ;adc X_OFFSET_TILE
           lda SPRITE_TILE_POS_X
           sta PARAM1
 
@@ -1541,6 +1533,20 @@ PLAYER_SPRITE_KNEEL
           lda #TEXT_DOESNT_WORK
           jmp AddText
 
+
+
+!lzone NavCom
+          ldy PLAYER_MAP_OBJECT
+          lda MAP_OBJECT_CONTENT,y
+          jmp AddText
+
+
+!lzone Elevator
+          ldy PLAYER_MAP_OBJECT
+          lda MAP_OBJECT_CONTENT,y
+          jmp HandleElevator
+
+
 !lzone PlayerSearchObject
           ldy PLAYER_MAP_OBJECT
           lda MAP_OBJECT_CONTENT,y
@@ -1555,7 +1561,7 @@ PLAYER_SPRITE_KNEEL
 
           cpy #ITEM_PISTOL
           beq .Gun
-          cpy #ITEM_KEYCARD_A
+          cpy #ITEM_KEYCARD_2
           beq .Keycard
 
           jmp .Empty
@@ -1572,7 +1578,7 @@ PLAYER_SPRITE_KNEEL
 .Keycard
           jsr DisplayInventory
 
-          lda #TEXT_FOUND_KEYCARD_A
+          lda #TEXT_FOUND_KEYCARD_2
           jmp AddText
 
 .Empty
@@ -1675,12 +1681,12 @@ CheckCollisions
 IsObjectCollidingWithObject
           ldx CURRENT_INDEX
           lda BIT_TABLE,x
-          and VIC.SPRITE_ENABLE
+          and SPRITES_ENABLED
           beq .NotTouching
 
           ldx CURRENT_SUB_INDEX
           lda BIT_TABLE,x
-          and VIC.SPRITE_ENABLE
+          and SPRITES_ENABLED
           beq .NotTouching
 
           lda SPRITE_HEIGHT_CHARS,x
@@ -1769,8 +1775,8 @@ SpawnObjectInSlot
 
           ;enable sprite
           lda BIT_TABLE,x
-          ora VIC.SPRITE_ENABLE
-          sta VIC.SPRITE_ENABLE
+          ora SPRITES_ENABLED
+          sta SPRITES_ENABLED
 
 .Outside
           lda PARAM3
@@ -1820,13 +1826,8 @@ SetupSpriteInSlot
           sta SPRITE_TILE_POS_X_DELTA,x
 
           ;calc tile pos
-          lda X_OFFSET_INSIDE_TILE
-          clc
-          adc SPRITE_CHAR_POS_X,x
-          lsr
-          lsr
-          clc
-          adc X_OFFSET_TILE
+          lda SPRITE_CHAR_POS_X,x
+          jsr CalcTilePosFromCharPos
           sta SPRITE_TILE_POS_X,x
 
           lda TYPE_START_STATE,y
@@ -1950,10 +1951,8 @@ SetupSpriteInSlot
           ;disable sprite
           lda BIT_TABLE,x
           eor #$ff
-          ;and SPRITE_ENABLED
-          and VIC.SPRITE_ENABLE
-          sta VIC.SPRITE_ENABLE
-          ;sta SPRITE_ENABLED
+          and SPRITES_ENABLED
+          sta SPRITES_ENABLED
           rts
 
 

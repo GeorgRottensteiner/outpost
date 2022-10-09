@@ -4,6 +4,8 @@ GAME_FIELD_HEIGHT_IN_TILES  = 6
 MAX_NUM_EXITS   = 5
 MAX_NUM_OBJECTS = 5
 
+NUM_UNLOCKABLE_DOORS    = 4
+
 
 !zone StartGame
 StartGame
@@ -49,8 +51,18 @@ StartGame
           sta ACTIVE_ITEM
           sta PLAYER_KNEELING
 
+          ldx #0
+-
+          sta UNLOCKED_DOOR,x
+          inx
+          cpx #NUM_UNLOCKABLE_DOORS
+          bne -
+
           lda #100
           sta PLAYER_HEALTH
+
+          lda #3
+          sta CURRENT_DECK
 
           lda #10
           sta PLAYER_ENERGY
@@ -71,26 +83,6 @@ StartGame
           jsr SetupPlayerInMap
 
 
-
-          ;jsr FullDraw
-
-;          lda #19
-;          sta PARAM1
-;          lda #7
-;          sta PARAM2
-;          lda #TYPE_PLAYER
-;          sta PARAM3
-;          jsr SpawnObject
-;          lda #2
-;          sta SPRITE_COUNT
-;
-;          lda #19
-;          sta PARAM1
-;          lda #10
-;          sta PARAM2
-;          lda #TYPE_PLAYER + 1
-;          sta PARAM3
-;          jsr SpawnObject
 
 !ifdef SHOW_DEBUG_VALUES {
           lda #1
@@ -246,8 +238,10 @@ SHOW_X = 10
           jsr HandleDisplayText
 
           lda GAME_PROGRESS
-          beq .NoEnemies
+          bne .CanSpawnEnemies
+          jmp .NoEnemies
 
+.CanSpawnEnemies
           inc ENEMY_SPAWN_DELAY
           bne .NoMore
 
@@ -259,6 +253,25 @@ SHOW_X = 10
           jsr GenerateRandomNumber
           and #$01
           beq .SpawnRight
+
+          lda #0
+          jsr CalcTilePosFromCharPos
+          bmi .NoEnemies
+
+          ;spawns in blocked area?
+          tay
+          lda CURRENT_MAP_DATA
+          clc
+          adc MAP_DATA_OFFSET_LO,y
+          sta ZEROPAGE_POINTER_1
+          lda CURRENT_MAP_DATA + 1
+          adc MAP_DATA_OFFSET_HI,y
+          sta ZEROPAGE_POINTER_1 + 1
+
+          ldy #4
+          lda (ZEROPAGE_POINTER_1),y
+          jsr IsTileBlocking
+          bne .NoEnemies
 
           lda #0
           sta PARAM1
@@ -277,6 +290,26 @@ HEX
 
 
 .SpawnRight
+          lda #39
+          jsr CalcTilePosFromCharPos
+          cmp CURRENT_MAP_WIDTH
+          bcs .NoEnemies
+
+          ;spawns in blocked area?
+          tay
+          lda CURRENT_MAP_DATA
+          clc
+          adc MAP_DATA_OFFSET_LO,y
+          sta ZEROPAGE_POINTER_1
+          lda CURRENT_MAP_DATA + 1
+          adc MAP_DATA_OFFSET_HI,y
+          sta ZEROPAGE_POINTER_1 + 1
+
+          ldy #4
+          lda (ZEROPAGE_POINTER_1),y
+          jsr IsTileBlocking
+          bne .NoEnemies
+
           lda #39
           sta PARAM1
           lda #8
@@ -1074,6 +1107,8 @@ DrawColumn
 
           lda #0
           sta EXIT_KEY_OBJECT,x
+          lda #$ff
+          sta EXIT_UNLOCK_INDEX,x
 
           ;key object?
           lda PARAM3
@@ -1082,6 +1117,10 @@ DrawColumn
           iny
           lda (ZEROPAGE_POINTER_1),y
           sta EXIT_KEY_OBJECT,x
+
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          sta EXIT_UNLOCK_INDEX,x
 
 .NoLockedDoor
           inx
@@ -1181,19 +1220,41 @@ DrawColumn
 
 .ThisExit
           ;exit index in y
+          ldx EXIT_UNLOCK_INDEX,y
+          bmi .NotUnlockable
+
+          ;already unlocked
+          lda UNLOCKED_DOOR,x
+          bne .Opening
+
+
+.NotUnlockable
           lda EXIT_KEY_OBJECT,y
           bmi .ExitIsLocked
           beq .Opening
           cmp ACTIVE_ITEM
-          beq .Opening
+          beq .OpeningWithItem
 
           lda ACTIVE_ITEM
           beq .ExitIsLocked
           jmp .CantOpen
 
+.OpeningWithItem
+          ;mark as unlocked
+          ldx EXIT_UNLOCK_INDEX,y
+          lda #1
+          sta UNLOCKED_DOOR,x
+
 .Opening
           sty PARAM1
+          lda EXIT_X_POS,y
           jsr OpenDoorAndWalkOut
+
+          lda #3
+          sta SPRITES_ENABLED
+
+          jsr ScreenOff
+
           ldy PARAM1
 
           lda EXIT_TARGET_MAP,y
@@ -1209,7 +1270,47 @@ DrawColumn
           dey
           bne -
 
+          lda #SPRITE_PLAYER_DOWN
+          sta SPRITE_IMAGE
+          lda #SPRITE_PLAYER_DOWN + 8
+          sta SPRITE_IMAGE + 1
+
+          jsr ScreenOn
+
           jmp WalkOutAndCloseDoor
+
+
+
+!lzone ScreenOff
+          lda #150
+          jsr WaitFrame
+
+          lda #$70
+          sta TOP_SCREEN_ACTIVE
+
+          lda SPRITES_ENABLED
+          sta STORED_ENABLED_SPRITES
+          lda #0
+          sta SPRITES_ENABLED
+
+          rts
+
+
+STORED_ENABLED_SPRITES
+          !byte 0
+
+
+
+!lzone ScreenOn
+          lda #150
+          jsr WaitFrame
+
+          lda STORED_ENABLED_SPRITES
+          sta SPRITES_ENABLED
+
+          lda #$10
+          sta TOP_SCREEN_ACTIVE
+          rts
 
 
 
@@ -1269,16 +1370,9 @@ DrawColumn
 
 
 
-;y, PARAM1 = exit index
+;a = tile pos of door
 !lzone OpenDoorAndWalkOut
-          ;char index from tile
-          lda EXIT_X_POS,y
-          sec
-          sbc X_OFFSET_TILE
-          asl
-          asl
-          sec
-          sbc X_OFFSET_INSIDE_TILE
+          jsr CalcCharPosFromTilePos
           sta OPEN_DOOR_X_POS
 
           ldy #0
@@ -1324,16 +1418,6 @@ DrawColumn
 
           lda #3
           sta SPRITE_STATE
-
-          lda #85
-          sta SPRITE_POS_Y
-          lda #85 + 21
-          sta SPRITE_POS_Y + 1
-
-          lda #SPRITE_PLAYER_DOWN
-          sta SPRITE_IMAGE
-          lda #SPRITE_PLAYER_DOWN + 4
-          sta SPRITE_IMAGE + 1
 
           ;inject open door!
           ldy #4
@@ -1451,6 +1535,202 @@ DOOR_TOP_TILES
           rts
 
 
+
+;a = elevator index
+!lzone HandleElevator
+          tay
+          ldx #0
+-
+          lda ELEVATOR_CHOICE,x
+          beq .Done
+          sta SCREEN_PANEL_POS + $82,x
+          inx
+          jmp -
+
+.Done
+          lda ELEVATOR_RANGE_TOP,y
+          sta PARAM1
+-
+          lda PARAM1
+          clc
+          adc #'0'
+          sta SCREEN_PANEL_POS + $83,x
+
+          lda PARAM1
+          cmp ELEVATOR_RANGE_BOTTOM,y
+          beq .DisplayDone
+
+          inc PARAM1
+
+          inx
+          inx
+          jmp -
+
+
+.DisplayDone
+          lda #0
+          sta PARAM1
+
+          sty PARAM4
+
+          lda CURRENT_DECK
+          sta PARAM3
+          sec
+          sbc ELEVATOR_RANGE_TOP,y
+          asl
+          clc
+          adc #$84 + 12
+          sta PARAM2
+
+.ElevatorLoop
+          lda #150
+          jsr WaitFrame
+
+          lda PARAM10
+          lsr
+          tay
+          lda COLOR_FADE_TABLE,y
+          ldx PARAM2
+          sta SCREEN_COLOR + ( SCREEN_PANEL_POS - SCREEN_CHAR ),x
+
+          inc PARAM10
+          lda PARAM10
+          and #$0f
+          sta PARAM10
+
+          lda #JOY_LEFT
+          jsr JoyReleasedControlPressed
+          bne .NotLeft
+
+          ldy PARAM4
+          lda PARAM3
+          cmp ELEVATOR_RANGE_TOP,y
+          beq .NotLeft
+
+          lda #1
+          ldx PARAM2
+          sta SCREEN_COLOR + ( SCREEN_PANEL_POS - SCREEN_CHAR ),x
+          dec PARAM2
+          dec PARAM2
+          dec PARAM3
+
+.NotLeft
+
+          lda #JOY_RIGHT
+          jsr JoyReleasedControlPressed
+          bne .NotRight
+
+          ldy PARAM4
+          lda PARAM3
+          cmp ELEVATOR_RANGE_BOTTOM,y
+          beq .NotRight
+
+          lda #1
+          ldx PARAM2
+          sta SCREEN_COLOR + ( SCREEN_PANEL_POS - SCREEN_CHAR ),x
+          inc PARAM2
+          inc PARAM2
+          inc PARAM3
+
+.NotRight
+          lda #JOY_BUTTON
+          jsr JoyReleasedControlPressed
+          bne .ElevatorLoop
+
+          lda PARAM3
+          cmp CURRENT_DECK
+          bne +
+
+          ;stay in deck, restore display
+          jmp ClearMapObjectDisplay
+
++
+          lda PARAM3
+          sta CURRENT_DECK
+
+          ldy PARAM4
+          sty .ELEVATOR_INDEX
+          lda PARAM3
+          sec
+          sbc ELEVATOR_RANGE_TOP,y
+          sta .ELEVATOR_TARGET_DECK
+
+          lda #23
+          sta OPEN_DOOR_TILE
+          lda SPRITE_TILE_POS_X
+          jsr OpenDoorAndWalkOut
+
+          lda #3
+          sta SPRITES_ENABLED
+
+          jsr ScreenOff
+
+.ELEVATOR_TARGET_DECK = * + 1
+          lda #$ff
+          asl
+          sta PARAM1
+
+          ;* 6
+          lda .ELEVATOR_INDEX
+          asl
+          clc
+          adc .ELEVATOR_INDEX
+          asl
+          clc
+          adc PARAM1
+          tay
+
+          lda ELEVATOR_EXIT_MAP,y
+          sta CURRENT_MAP_INDEX
+
+          iny
+          lda ELEVATOR_EXIT_MAP,y
+          sta OPEN_DOOR_X_POS
+          jsr SetupPlayerInMap
+
+          ldy #10
+-
+          jsr ObjectMoveUp
+          dey
+          bne -
+
+          lda #SPRITE_PLAYER_DOWN
+          sta SPRITE_IMAGE
+          lda #SPRITE_PLAYER_DOWN + 8
+          sta SPRITE_IMAGE + 1
+
+          jsr ScreenOn
+
+          jmp WalkOutAndCloseDoor
+
+
+.ELEVATOR_INDEX
+          !byte 0
+
+
+
+!lzone ClearMapObjectDisplay
+          ldx #0
+-
+          lda #1
+          sta SCREEN_COLOR + ( SCREEN_PANEL_POS - SCREEN_CHAR ) + $82,x
+          lda #32
+          sta SCREEN_PANEL_POS + $82,x
+          inx
+          cpx #20
+          bne -
+          rts
+
+
+
+ELEVATOR_CHOICE
+          !scr " target deck:",0
+
+COLOR_FADE_TABLE
+          !byte 1,3,6,0,0,6,3,1
+
+
+
 NUM_EXITS
           !byte 0
 
@@ -1465,6 +1745,12 @@ EXIT_TARGET_X_POS
           !fill MAX_NUM_EXITS
 EXIT_KEY_OBJECT
           !fill MAX_NUM_EXITS
+EXIT_UNLOCK_INDEX
+          !fill MAX_NUM_EXITS
+
+UNLOCKED_DOOR
+          !fill NUM_UNLOCKABLE_DOORS
+
 
 MAP_OBJECT_X_POS
           !fill MAX_NUM_OBJECTS
@@ -1520,19 +1806,32 @@ PLAYER_ENERGY
 PLAYER_KNEELING
           !byte 0
 
+CURRENT_DECK
+          !byte 0
+
 MAP_OBJECT_NAME_LO
           !byte <MO_LOCKER
           !byte <MO_POWER_OUTLET
+          !byte <MO_COM
+          !byte <MO_ELEVATOR
 
 MAP_OBJECT_NAME_HI
           !byte >MO_LOCKER
           !byte >MO_POWER_OUTLET
+          !byte >MO_COM
+          !byte >MO_ELEVATOR
 
 MO_LOCKER
           !scr "locker",0
 
 MO_POWER_OUTLET
           !scr "power outlet",0
+
+MO_COM
+          !scr "navcom",0
+
+MO_ELEVATOR
+          !scr "elevator",0
 
 ;tile index of detected door (18 or 23)
 OPEN_DOOR_TILE
@@ -1546,11 +1845,15 @@ PLAYER_MAP_OBJECT
 
 MAP_OBJECT_ACTION_LO
           !byte <PlayerSearchObject       ;locker
-          !byte <ChargeObject             ;locker
+          !byte <ChargeObject
+          !byte <NavCom
+          !byte <Elevator
 
 MAP_OBJECT_ACTION_HI
           !byte >PlayerSearchObject           ;locker
-          !byte >ChargeObject             ;locker
+          !byte >ChargeObject
+          !byte >NavCom
+          !byte >Elevator
 
 ;0 = start, 1 = picked gun
 GAME_PROGRESS
@@ -1565,3 +1868,17 @@ MAP_DATA_OFFSET_HI
 !for COL = 0 to 31
           !byte >( COL * 6 )
 !end
+
+
+SPRITES_ENABLED
+          !byte 0
+
+ELEVATOR_RANGE_TOP
+          !byte 2
+
+ELEVATOR_RANGE_BOTTOM
+          !byte 4
+
+;3 two byte entries per elevator  target map, exit x
+ELEVATOR_EXIT_MAP
+          !byte 7, 9, 2, 3, 8, 9

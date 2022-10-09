@@ -1,8 +1,11 @@
-NUM_KNOWN_ITEMS = 3
+NUM_KNOWN_ITEMS = 6
 
 ITEM_NONE         = 0
 ITEM_PISTOL       = 1
-ITEM_KEYCARD_A    = 2
+ITEM_KEYCARD_1    = 2
+ITEM_KEYCARD_2    = 3
+ITEM_KEYCARD_3    = 4
+ITEM_KEYCARD_4    = 5
 
 
 
@@ -212,6 +215,7 @@ ITEM_KEYCARD_A    = 2
           ldy CURRENT_DISPLAY_TEXT_POS
           lda (ZEROPAGE_POINTER_1),y
           beq .Done
+          bmi .NextLine
 
           sta (ZEROPAGE_POINTER_2),y
 
@@ -222,6 +226,21 @@ ITEM_KEYCARD_A    = 2
           lda #0
           sta CURRENT_DISPLAY_TEXT + 1
           sta DISPLAY_TEXT_SHIFT_PAUSE
+          rts
+
+.NextLine
+          jsr ShiftTextUp
+
+          lda CURRENT_DISPLAY_TEXT_POS
+          sec
+          adc CURRENT_DISPLAY_TEXT
+          sta CURRENT_DISPLAY_TEXT
+          bcc +
+          inc CURRENT_DISPLAY_TEXT + 1
++
+
+          lda #0
+          sta CURRENT_DISPLAY_TEXT_POS
           rts
 
 
@@ -238,20 +257,6 @@ ACTIVE_ITEM
 ITEM_COLLECTED
           !fill NUM_KNOWN_ITEMS
 
-ITEM_NAME_LO
-          !byte <IN_PISTOL
-          !byte <IN_KEYCARD_A
-
-ITEM_NAME_HI
-          !byte >IN_PISTOL
-          !byte >IN_KEYCARD_A
-
-IN_PISTOL
-          !text "pistol",0
-
-IN_KEYCARD_A
-          !text "keycard a",0
-
 DISPLAY_TEXT_SHIFT_PAUSE
           !byte 0
 
@@ -259,29 +264,40 @@ DISPLAY_TEXT_SHIFT_PAUSE
 TEXT_FOUND_PISTOL     = 0
 TEXT_FOUND_NOTHING    = 1
 TEXT_INTRO            = 2
-TEXT_FOUND_KEYCARD_A  = 3
-TEXT_DOOR_LOCKED      = 4
-TEXT_DOESNT_WORK      = 5
-TEXT_CHARGED          = 6
+TEXT_FOUND_KEYCARD_1  = 3
+TEXT_FOUND_KEYCARD_2  = 4
+TEXT_FOUND_KEYCARD_3  = 5
+TEXT_FOUND_KEYCARD_4  = 6
+TEXT_DOOR_LOCKED      = 7
+TEXT_DOESNT_WORK      = 8
+TEXT_CHARGED          = 9
 
 
 TEXT_LO
           !byte <TX_FOUND_PISTOL
           !byte <TX_FOUND_NOTHING
           !byte <TX_INTRO
-          !byte <TX_FOUND_KEYCARD_A
+          !byte <TX_FOUND_KEYCARD_1
+          !byte <TX_FOUND_KEYCARD_2
+          !byte <TX_FOUND_KEYCARD_3
+          !byte <TX_FOUND_KEYCARD_4
           !byte <TX_DOOR_LOCKED
           !byte <TX_DOESNT_WORK
           !byte <TX_CHARGED
+          !byte <TX_NAVCOM1_1
 
 TEXT_HI
           !byte >TX_FOUND_PISTOL
           !byte >TX_FOUND_NOTHING
           !byte >TX_INTRO
-          !byte >TX_FOUND_KEYCARD_A
+          !byte >TX_FOUND_KEYCARD_1
+          !byte >TX_FOUND_KEYCARD_2
+          !byte >TX_FOUND_KEYCARD_3
+          !byte >TX_FOUND_KEYCARD_4
           !byte >TX_DOOR_LOCKED
           !byte >TX_DOESNT_WORK
           !byte >TX_CHARGED
+          !byte >TX_NAVCOM1_1
 
 
 TX_FOUND_PISTOL
@@ -293,8 +309,8 @@ TX_FOUND_NOTHING
 TX_INTRO
           !scr "ugh. my head!",0
 
-TX_FOUND_KEYCARD_A
-          !scr "your keycard",0
+TX_FOUND_KEYCARD_2
+          !scr "keycard 2",0
 
 TX_DOOR_LOCKED
           !scr "it's locked!",0
@@ -304,3 +320,16 @@ TX_DOESNT_WORK
 
 TX_CHARGED
           !scr "it's charged",0
+
+TX_NAVCOM1_1
+          !scr "jenna! finally!",$80,"i need your help!",$80,"get over to the",$80,"crew rooms!",0
+
+TX_FOUND_KEYCARD_1
+          !scr "keycard 1",0
+
+TX_FOUND_KEYCARD_3
+          !scr "keycard 3",0
+
+TX_FOUND_KEYCARD_4
+          !scr "keycard 4",0
+
