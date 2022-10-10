@@ -613,7 +613,7 @@ IsCharBlocking
 
 !zone IsTileBlocking
 IsTileBlocking
-          cmp #14
+          cmp #10
           bne .NotBlocking
 
           lda #1
@@ -1000,7 +1000,8 @@ ObjectControl
           ldy #8
           lda PARAM3
           clc
-          adc #2
+          ;adc #2
+          adc #1
           jsr DrawTile
 
           dec DOOR_OPEN_POS
@@ -1034,7 +1035,7 @@ ObjectControl
           bne .DoorHandlingDone
 
           lda OPEN_DOOR_TILE
-          cmp #23
+          cmp #DOOR_TILE_CLOSED
           beq .CloseDoor
           inc SPRITE_STATE
 .CloseDoor
@@ -1098,7 +1099,7 @@ ObjectControl
           ldy #8
           lda PARAM3
           clc
-          adc #2
+          adc #1
           jsr DrawTile
 
           inc DOOR_OPEN_POS
@@ -1300,9 +1301,9 @@ ObjectControl
 
           ldy #4
           lda (ZEROPAGE_POINTER_1),y
-          cmp #18
+          cmp #DOOR_TILE_OPEN
           beq .OpenDoor
-          cmp #23
+          cmp #DOOR_TILE_CLOSED
           bne +
 
           ;closed/locked door

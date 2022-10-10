@@ -1,4 +1,4 @@
-NUM_KNOWN_ITEMS = 6
+NUM_KNOWN_ITEMS = 7
 
 ITEM_NONE         = 0
 ITEM_PISTOL       = 1
@@ -6,6 +6,7 @@ ITEM_KEYCARD_1    = 2
 ITEM_KEYCARD_2    = 3
 ITEM_KEYCARD_3    = 4
 ITEM_KEYCARD_4    = 5
+ITEM_KEYCARD_BIO  = 6
 
 
 
@@ -285,6 +286,7 @@ TEXT_LO
           !byte <TX_DOESNT_WORK
           !byte <TX_CHARGED
           !byte <TX_NAVCOM1_1
+          !byte <TX_NAVCOM1_2
 
 TEXT_HI
           !byte >TX_FOUND_PISTOL
@@ -298,6 +300,7 @@ TEXT_HI
           !byte >TX_DOESNT_WORK
           !byte >TX_CHARGED
           !byte >TX_NAVCOM1_1
+          !byte >TX_NAVCOM1_2
 
 
 TX_FOUND_PISTOL
@@ -322,7 +325,7 @@ TX_CHARGED
           !scr "it's charged",0
 
 TX_NAVCOM1_1
-          !scr "jenna! finally!",$80,"i need your help!",$80,"get over to the",$80,"crew rooms!",0
+          !scr "jenna! finally!",$80,"i need your help!",$80,"get up to the",$80,"bio lab!",0
 
 TX_FOUND_KEYCARD_1
           !scr "keycard 1",0
@@ -333,3 +336,5 @@ TX_FOUND_KEYCARD_3
 TX_FOUND_KEYCARD_4
           !scr "keycard 4",0
 
+TX_NAVCOM1_2
+          !scr "we're locked in",$80,"the labs! i forgot",$80,"my keycard in",$80,"the docking bay!",0

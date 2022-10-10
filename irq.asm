@@ -67,7 +67,8 @@ IrqTop
           lda #$ff
           sta VIC.IRQ_REQUEST
 
-          lda #12
+          ldy CURRENT_DECK
+          lda DECK_BG_COLOR,y
           sta VIC.BACKGROUND_COLOR
 
           ;prepare sprites for next frame

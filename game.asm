@@ -4,7 +4,10 @@ GAME_FIELD_HEIGHT_IN_TILES  = 6
 MAX_NUM_EXITS   = 5
 MAX_NUM_OBJECTS = 5
 
-NUM_UNLOCKABLE_DOORS    = 4
+NUM_UNLOCKABLE_DOORS    = 6
+
+DOOR_TILE_OPEN    = 14
+DOOR_TILE_CLOSED  = 18
 
 
 !zone StartGame
@@ -1384,7 +1387,7 @@ STORED_ENABLED_SPRITES
           sta SPRITE_STATE
 
           lda OPEN_DOOR_TILE
-          cmp #18
+          cmp #DOOR_TILE_OPEN
           bne +
 
           ;it's a closed door, we need the open door anim
@@ -1438,7 +1441,8 @@ STORED_ENABLED_SPRITES
           ldy #8
           lda PARAM3
           clc
-          adc #2
+          ;adc #2
+          adc #1
           jsr DrawTile
 
 .CloseDoorLoop
@@ -1460,11 +1464,11 @@ DOOR_OPEN_DELAY
           !byte 0
 
 DOOR_TOP_TILES
-          !byte 21      ;closed
-          !byte 25      ;opening 1
-          !byte 28      ;opening 2
-          !byte 31      ;opening 3
-          !byte 16      ;open
+          !byte 17      ;closed
+          !byte 20      ;opening 1
+          !byte 23      ;opening 2
+          !byte 26      ;opening 3
+          !byte 12      ;open
 
 
 ;x,y = pos on screen
@@ -1645,17 +1649,18 @@ DOOR_TOP_TILES
           jmp ClearMapObjectDisplay
 
 +
-          lda PARAM3
-          sta CURRENT_DECK
+
+          jsr ClearMapObjectDisplay
 
           ldy PARAM4
           sty .ELEVATOR_INDEX
           lda PARAM3
+          sta .NEXT_DECK
           sec
           sbc ELEVATOR_RANGE_TOP,y
           sta .ELEVATOR_TARGET_DECK
 
-          lda #23
+          lda #DOOR_TILE_CLOSED
           sta OPEN_DOOR_TILE
           lda SPRITE_TILE_POS_X
           jsr OpenDoorAndWalkOut
@@ -1664,6 +1669,13 @@ DOOR_TOP_TILES
           sta SPRITES_ENABLED
 
           jsr ScreenOff
+
+.NEXT_DECK = * + 1
+          lda #$ff
+          sta CURRENT_DECK
+          clc
+          adc #'0'
+          sta SCREEN_PANEL_POS + $18c
 
 .ELEVATOR_TARGET_DECK = * + 1
           lda #$ff
@@ -1833,7 +1845,7 @@ MO_COM
 MO_ELEVATOR
           !scr "elevator",0
 
-;tile index of detected door (18 or 23)
+;tile index of detected door (DOOR_TILE_OPEN or DOOR_TILE_CLOSED)
 OPEN_DOOR_TILE
           !byte 0
 OPEN_DOOR_X_POS
@@ -1882,3 +1894,7 @@ ELEVATOR_RANGE_BOTTOM
 ;3 two byte entries per elevator  target map, exit x
 ELEVATOR_EXIT_MAP
           !byte 7, 9, 2, 3, 8, 9
+
+
+DECK_BG_COLOR = * - 1
+          !byte 2, 5, 12, 14, 3
