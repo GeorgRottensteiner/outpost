@@ -91,6 +91,8 @@ IrqTop
           cpx #8
           bne -
 
+          jsr SFXUpdate
+
           pla
           tay
           pla
@@ -184,12 +186,27 @@ IrqPanelTop
 ;a = char pos (on screen)
 ;returns a = tile pos
 !lzone CalcTilePosFromCharPos
+          bmi .Negative
           clc
           adc X_OFFSET_INSIDE_TILE
           lsr
           lsr
           clc
           adc X_OFFSET_TILE
+          rts
+
+.Negative
+          sta PARAM11
+
+          lda X_OFFSET_TILE
+          asl
+          asl
+          clc
+          adc PARAM1
+          clc
+          adc X_OFFSET_INSIDE_TILE
+          lsr
+          lsr
           rts
 
 

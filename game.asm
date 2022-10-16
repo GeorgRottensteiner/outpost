@@ -2,9 +2,16 @@ GAME_FIELD_FIRST_LINE       = 0
 GAME_FIELD_HEIGHT_IN_TILES  = 6
 
 MAX_NUM_EXITS   = 5
-MAX_NUM_OBJECTS = 5
+MAX_NUM_OBJECTS = 8
 
-NUM_UNLOCKABLE_DOORS    = 6
+;0 - 3 = crew #1 to #4
+;4 = bio labs #1 left
+;5 = bio labs #1 right
+;6 = bridge
+;7 = escape pods
+NUM_UNLOCKABLE_DOORS      = 8
+
+NUM_SPECIAL_INDEX_ENEMIES = 3
 
 DOOR_TILE_OPEN    = 14
 DOOR_TILE_CLOSED  = 18
@@ -50,9 +57,21 @@ StartGame
           sta ACTIVE_ENEMY_COUNT
           sta CURRENT_DISPLAY_TEXT
           sta CURRENT_DISPLAY_TEXT_POS
+          sta CURRENT_DISPLAY_TEXT + 1
+          sta DISPLAY_TEXT_SHIFT_PAUSE
           sta GAME_PROGRESS
           sta ACTIVE_ITEM
           sta PLAYER_KNEELING
+          sta GAME_COMPLETED
+          sta GAME_KNOW_ABOUT_BIO_LAB_DOORS
+          sta PLAYER_CARRIES_GUN
+
+          ldx #0
+-
+          sta SPECIAL_INDEX_ENEMY_KILLED,x
+          inx
+          cpx #NUM_SPECIAL_INDEX_ENEMIES
+          bne -
 
           ldx #0
 -
@@ -78,7 +97,6 @@ StartGame
           ;start location
           ldy #4
           sty CURRENT_MAP_INDEX
-          ;jsr SetupMapData
 
           ;a = target tile X
           ;map set in CURRENT_MAP_INDEX
@@ -116,6 +134,20 @@ StartGame
 GameLoop
           lda #150
           jsr WaitFrame
+
+          lda GAME_COMPLETED
+          beq +
+
+          jmp GameCompleted
+
++
+
+          lda PLAYER_HEALTH
+          bne +
+
+          jmp GameOver
+
++
 
 !ifdef SHOW_DEBUG_VALUES {
 SPRITE_INDEX_TO_SHOW = 0
@@ -245,13 +277,26 @@ SHOW_X = 10
           jmp .NoEnemies
 
 .CanSpawnEnemies
-          inc ENEMY_SPAWN_DELAY
-          bne .NoMore
-
+          jsr GenerateRandomNumber
+          and #$03
+          adc ENEMY_SPAWN_DELAY
+          clc
+          adc GAME_PROGRESS
+          sta ENEMY_SPAWN_DELAY
+          bcs +
+          jmp .NoMore
++
           lda ACTIVE_ENEMY_COUNT
-          ;cmp #4
-          cmp #1
-          beq .NoMore
+          cmp GAME_PROGRESS
+          bne .SpawnBlob
+          jmp .NoMore
+
+.SpawnBlob
+          jsr GenerateRandomNumber
+          and #$01
+          clc
+          adc #8
+          sta PARAM2
 
           jsr GenerateRandomNumber
           and #$01
@@ -278,11 +323,14 @@ SHOW_X = 10
 
           lda #0
           sta PARAM1
-          lda #8
-          sta PARAM2
           lda #TYPE_BLOB
           sta PARAM3
-          jsr SpawnObject
+
+          ldx #3
+          jsr FindEmptySpriteSlotWithStartingX
+          beq .NoMore
+          jsr SpawnObjectInSlot
+          beq .NoMore
 
           jmp .Spawned
 
@@ -315,11 +363,13 @@ HEX
 
           lda #39
           sta PARAM1
-          lda #8
-          sta PARAM2
           lda #TYPE_BLOB
           sta PARAM3
-          jsr SpawnObject
+          ldx #3
+          jsr FindEmptySpriteSlotWithStartingX
+          beq .NoMore
+          jsr SpawnObjectInSlot
+          beq .NoMore
 
           lda #1
           sta SPRITE_DIRECTION,x
@@ -519,6 +569,7 @@ ScrollRightToLeft
 
 +
 
+ScrollRightToLeftForced
           dec SCROLL_OFFSET_X
           lda SCROLL_OFFSET_X
           and #$07
@@ -627,7 +678,6 @@ ScrollRightToLeft
           and #$03
           tax
           cpx #2
-          ;bne +
           bcs +
 
           ;1 tile more
@@ -687,6 +737,7 @@ ScrollRightToLeft
 
           jsr ObjectShiftLeft
 .Skip
+          ldx CURRENT_SUB_INDEX
           lda CURRENT_SUB_INDEX
           clc
           adc SPRITE_COUNT,x
@@ -862,6 +913,7 @@ ScrollLeftToRight
           jsr ObjectShiftRight
 
 .Skip
+          ldx CURRENT_SUB_INDEX
           lda CURRENT_SUB_INDEX
           clc
           adc SPRITE_COUNT,x
@@ -1085,6 +1137,12 @@ DrawColumn
           lda (ZEROPAGE_POINTER_1),y
           and #$0f
           sta NUM_EXITS
+
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          sta NUM_SPECIAL_OBJECTS
+
+          lda NUM_EXITS
           sta PARAM2
           beq .NoExits
 
@@ -1159,6 +1217,66 @@ DrawColumn
           bne -
 
 .NoMapObjects
+
+          lda NUM_SPECIAL_OBJECTS
+          beq .NoSpecialObjects
+
+          ldx #0
+          stx CURRENT_SUB_INDEX
+
+-
+          ;sprite x
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          jsr CalcCharPosFromTilePos
+          sta PARAM1
+
+          ;sprite type
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          sta PARAM3
+
+          ;special object index
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          sta PARAM4
+
+          ;min. required game progression value
+          iny
+          lda (ZEROPAGE_POINTER_1),y
+          cmp GAME_PROGRESS
+          bcs .EnemyNotSpawningYet
+
+          ldy PARAM4
+          lda SPECIAL_INDEX_ENEMY_KILLED,y
+          bne .EnemyIsAlreadyKilled
+
+          lda #7
+          sta PARAM2
+          ldx #2
+          jsr FindEmptySpriteSlotWithStartingX
+          jsr SpawnObjectInSlot
+
+          lda PARAM2
+          clc
+          adc #3
+          sta PARAM2
+          inc PARAM3
+          inx
+          jsr SpawnObjectInSlot
+          lda PARAM4
+          sta SPRITE_VALUE - 1,x
+          sta SPRITE_VALUE,x
+
+.EnemyNotSpawningYet
+.EnemyIsAlreadyKilled
+          inc CURRENT_SUB_INDEX
+          ldx CURRENT_SUB_INDEX
+          dec NUM_SPECIAL_OBJECTS
+          bne -
+
+.NoSpecialObjects
+
 
           ;sanitize x-offset-tile so we don't scroll outside!
           lda CURRENT_MAP_WIDTH
@@ -1253,10 +1371,11 @@ DrawColumn
           lda EXIT_X_POS,y
           jsr OpenDoorAndWalkOut
 
-          lda #3
-          sta SPRITES_ENABLED
+          ;lda #3
+          ;sta SPRITES_ENABLED
 
           jsr ScreenOff
+          jsr RemoveAllObjects
 
           ldy PARAM1
 
@@ -1291,25 +1410,12 @@ DrawColumn
           lda #$70
           sta TOP_SCREEN_ACTIVE
 
-          lda SPRITES_ENABLED
-          sta STORED_ENABLED_SPRITES
-          lda #0
-          sta SPRITES_ENABLED
-
           rts
-
-
-STORED_ENABLED_SPRITES
-          !byte 0
-
 
 
 !lzone ScreenOn
           lda #150
           jsr WaitFrame
-
-          lda STORED_ENABLED_SPRITES
-          sta SPRITES_ENABLED
 
           lda #$10
           sta TOP_SCREEN_ACTIVE
@@ -1332,12 +1438,14 @@ STORED_ENABLED_SPRITES
           lda #0
           sta X_OFFSET_INSIDE_TILE
 
+          jsr RemoveAllObjects
+
           ldy CURRENT_MAP_INDEX
           jsr SetupMapData
 
           jsr FullDraw
 
-          jsr RemoveAllObjects
+
 
 .PLAYER_TARGET_TILE = * + 1
           lda #$ff
@@ -1392,8 +1500,12 @@ STORED_ENABLED_SPRITES
 
           ;it's a closed door, we need the open door anim
           inc SPRITE_STATE_POS
+          jmp .OpenDoorLoop
 
 +
+          ldy #SFX_DOOR
+          jsr PlaySoundEffect
+
 
 .OpenDoorLoop
           lda #150
@@ -1424,7 +1536,7 @@ STORED_ENABLED_SPRITES
 
           ;inject open door!
           ldy #4
-          lda DOOR_TOP_TILES,y
+          lda DOOR_TOP_TILES + 4
           sta PARAM3
 
           ldx OPEN_DOOR_X_POS
@@ -1438,11 +1550,8 @@ STORED_ENABLED_SPRITES
           adc #1
           jsr DrawTile
           ldx OPEN_DOOR_X_POS
+          lda DOOR_BOTTOM_TILES + 4
           ldy #8
-          lda PARAM3
-          clc
-          ;adc #2
-          adc #1
           jsr DrawTile
 
 .CloseDoorLoop
@@ -1469,6 +1578,13 @@ DOOR_TOP_TILES
           !byte 23      ;opening 2
           !byte 26      ;opening 3
           !byte 12      ;open
+
+DOOR_BOTTOM_TILES
+          !byte 18      ;closed
+          !byte 22      ;opening 1
+          !byte 25      ;opening 2
+          !byte 28      ;opening 3
+          !byte 14      ;open
 
 
 ;x,y = pos on screen
@@ -1618,6 +1734,9 @@ DOOR_TOP_TILES
           dec PARAM2
           dec PARAM3
 
+          ldy #SFX_BLIP
+          jsr PlaySoundEffect
+
 .NotLeft
 
           lda #JOY_RIGHT
@@ -1635,6 +1754,9 @@ DOOR_TOP_TILES
           inc PARAM2
           inc PARAM2
           inc PARAM3
+
+          ldy #SFX_BLIP
+          jsr PlaySoundEffect
 
 .NotRight
           lda #JOY_BUTTON
@@ -1735,6 +1857,68 @@ DOOR_TOP_TILES
 
 
 
+!lzone GameOver
+          lda #0
+          sta CURRENT_DISPLAY_TEXT
+          sta CURRENT_DISPLAY_TEXT_POS
+          sta CURRENT_DISPLAY_TEXT + 1
+
+          lda #TEXT_GAME_OVER
+          jsr AddText
+
+.GOLoop
+          lda #150
+          jsr WaitFrame
+
+          jsr HandleDisplayText
+
+          lda #JOY_BUTTON
+          jsr JoyReleasedControlPressed
+          bne .GOLoop
+
+          jmp Title
+
+
+!lzone GameCompleted
+          lda #0
+          sta PARAM10
+          sta PARAM11
+
+          ldx #0
+          jsr RemoveObject
+          ldx #1
+          jsr RemoveObject
+
+.GOLoop
+          lda #150
+          jsr WaitFrame
+
+          jsr HandleDisplayText
+
+          ;can only skip once the second message appeared
+          lda PARAM11
+          beq +
+
+          lda #JOY_BUTTON
+          jsr JoyReleasedControlPressed
+          bne +
+
+          jmp Title
+
++
+          lda PARAM11
+          bne .GOLoop
+
+          dec PARAM10
+          bne .GOLoop
+
+          inc PARAM11
+          lda #TEXT_GAME_COMPLETED
+          jsr AddText
+          jmp .GOLoop
+
+
+
 ELEVATOR_CHOICE
           !scr " target deck:",0
 
@@ -1747,6 +1931,9 @@ NUM_EXITS
           !byte 0
 
 NUM_MAP_OBJECTS
+          !byte 0
+
+NUM_SPECIAL_OBJECTS
           !byte 0
 
 EXIT_X_POS
@@ -1821,17 +2008,32 @@ PLAYER_KNEELING
 CURRENT_DECK
           !byte 0
 
+GAME_COMPLETED
+          !byte 0
+
+SPECIAL_INDEX_ENEMY_KILLED
+          !fill NUM_SPECIAL_INDEX_ENEMIES
+
 MAP_OBJECT_NAME_LO
           !byte <MO_LOCKER
           !byte <MO_POWER_OUTLET
           !byte <MO_COM
           !byte <MO_ELEVATOR
+          !byte <MO_CONTROL_PANEL
+          !byte <MO_CONTROL_PANEL
+          !byte <MO_ESCAPE_POD
+          !byte <MO_CONTROL_PANEL
+
 
 MAP_OBJECT_NAME_HI
           !byte >MO_LOCKER
           !byte >MO_POWER_OUTLET
           !byte >MO_COM
           !byte >MO_ELEVATOR
+          !byte >MO_CONTROL_PANEL
+          !byte >MO_CONTROL_PANEL
+          !byte >MO_ESCAPE_POD
+          !byte >MO_CONTROL_PANEL
 
 MO_LOCKER
           !scr "locker",0
@@ -1844,6 +2046,14 @@ MO_COM
 
 MO_ELEVATOR
           !scr "elevator",0
+
+MO_CONTROL_PANEL
+          !scr "control panel",0
+
+MO_ESCAPE_POD
+          !scr "escape pod",0
+
+
 
 ;tile index of detected door (DOOR_TILE_OPEN or DOOR_TILE_CLOSED)
 OPEN_DOOR_TILE
@@ -1860,14 +2070,25 @@ MAP_OBJECT_ACTION_LO
           !byte <ChargeObject
           !byte <NavCom
           !byte <Elevator
+          !byte <ControlPanel
+          !byte <NavCom         ;useless control panel
+          !byte <EscapePod
+          !byte <ControlPanelBridge
 
 MAP_OBJECT_ACTION_HI
           !byte >PlayerSearchObject           ;locker
           !byte >ChargeObject
           !byte >NavCom
           !byte >Elevator
+          !byte >ControlPanel
+          !byte >NavCom         ;useless control panel
+          !byte >EscapePod
+          !byte >ControlPanelBridge
 
 ;0 = start, 1 = picked gun
+;  +1 = unlocked bio lab door
+;  +1 = picked bridge key card
+;  +1 = started self destruction
 GAME_PROGRESS
           !byte 0
 
@@ -1887,14 +2108,23 @@ SPRITES_ENABLED
 
 ELEVATOR_RANGE_TOP
           !byte 2
+          !byte 1
+          !byte 4
 
 ELEVATOR_RANGE_BOTTOM
           !byte 4
+          !byte 2
+          !byte 5
 
 ;3 two byte entries per elevator  target map, exit x
 ELEVATOR_EXIT_MAP
-          !byte 7, 9, 2, 3, 8, 9
+          !byte 7, 9, 2, 3, 8, 7
+          !byte 14, 5, 7, 13, 0, 0
+          !byte 8, 11, 16, 9, 0, 0
 
 
 DECK_BG_COLOR = * - 1
           !byte 2, 5, 12, 14, 3
+
+GAME_KNOW_ABOUT_BIO_LAB_DOORS
+          !byte 0

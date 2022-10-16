@@ -16,11 +16,14 @@ SPRITE_PLAYER_KNEEL_L   = SPRITE_BASE + 61
 SPRITE_PLAYER_UP        = SPRITE_BASE + 36
 SPRITE_PLAYER_DOWN      = SPRITE_BASE + 32
 
+SPRITE_BIG_BLOB_L       = SPRITE_BASE + 64
+
 TYPE_PLAYER             = 1
 TYPE_PLAYER_SHOT        = 3
 TYPE_EXPLOSION          = 4
 TYPE_BLOB               = 5
-
+TYPE_BIG_BLOB           = 6
+;7 = blob bottom
 
 OBJECT_HEIGHT           = 16
 
@@ -51,7 +54,6 @@ RemoveAllObjects
 ;x = object index
 ;return 1 if moved, 0 if blocked
 ;------------------------------------------------------------
-
 !zone ObjectMoveLeftBlocking
 ObjectMoveLeftBlocking
           lda SPRITE_TILE_POS_X_DELTA,x
@@ -114,10 +116,28 @@ ObjectMoveLeft
           lda SPRITE_COUNT,x
           sta PARAM12
 -
+          dec PARAM12
+          beq .Done1
+
+          lda SPRITE_CHAR_POS_X,x
+          sta SPRITE_CHAR_POS_X + 1,x
+          lda SPRITE_POS_X,x
+          sta SPRITE_POS_X + 1,x
+
+          inx
+          jmp -
+
+.Done1
+          ldx CURRENT_INDEX
+
+          lda SPRITE_COUNT,x
+          sta PARAM12
+-
           jsr MoveSpriteLeft
 
           dec PARAM12
           beq .Done
+
           inx
           jmp -
 
@@ -270,10 +290,28 @@ ObjectMoveRight
           lda SPRITE_COUNT,x
           sta PARAM12
 -
+          dec PARAM12
+          beq .Done1
+
+          lda SPRITE_CHAR_POS_X,x
+          sta SPRITE_CHAR_POS_X + 1,x
+          lda SPRITE_POS_X,x
+          sta SPRITE_POS_X + 1,x
+
+          inx
+          jmp -
+
+.Done1
+          ldx CURRENT_INDEX
+
+          lda SPRITE_COUNT,x
+          sta PARAM12
+-
           jsr MoveSpriteRight
 
           dec PARAM12
           beq .Done
+
           inx
           jmp -
 
@@ -600,7 +638,7 @@ IsCharBlocking
           cmp #124
           bcc .NotBlocking
 
-.Blocking
+;.Blocking
           lda #1
           rts
 
@@ -633,6 +671,8 @@ ENEMY_BEHAVIOUR_TABLE_LO
           !byte <BHPlayerShot
           !byte <BHExplosion
           !byte <BHBlob
+          !byte <BHBigBlob
+          !byte <BHBigBlob2 ;part #2
 
 ENEMY_BEHAVIOUR_TABLE_HI
           !byte >BHPlayer
@@ -640,6 +680,9 @@ ENEMY_BEHAVIOUR_TABLE_HI
           !byte >BHPlayerShot
           !byte >BHExplosion
           !byte >BHBlob
+          !byte >BHBigBlob
+          !byte >BHBigBlob2     ;part #2
+
 
 
 
@@ -681,17 +724,22 @@ EXPLOSION_COLOR
 !zone BHPlayerShot
 BHPlayerShot
           jsr CheckCollisions
-          bcc .NotColliding
+          bcc .NotColliding2
+
+          ldx CURRENT_INDEX
 
           lda SPRITE_ACTIVE,y
           cmp #TYPE_BLOB
-          bne .NotColliding
+          bne .NotColliding1
 
           dec ACTIVE_ENEMY_COUNT
           jsr RemoveObject
-          tya
-          tax
+          sty CURRENT_SUB_INDEX
 
+          ldy #SFX_EXPLODE
+          jsr PlaySoundEffect
+
+          ldx CURRENT_SUB_INDEX
           lda #TYPE_EXPLOSION
           jsr SetupSpriteInSlot
 
@@ -703,7 +751,43 @@ BHPlayerShot
 
 
 
-.NotColliding
+.NotColliding1
+          cmp #TYPE_BIG_BLOB
+          bne .NotColliding2
+
+          ldx CURRENT_SUB_INDEX
+          dec SPRITE_HP,x
+          bne .ExplodeShot
+
+          ;mark as killed
+          ldy SPRITE_VALUE,x
+          lda #1
+          sta SPECIAL_INDEX_ENEMY_KILLED,y
+
+          lda #TYPE_EXPLOSION
+          jsr SetupSpriteInSlot
+          ldx CURRENT_SUB_INDEX
+          inx
+          lda #TYPE_EXPLOSION
+          jsr SetupSpriteInSlot
+
+          ldy #SFX_EXPLODE
+          jsr PlaySoundEffect
+
+.ExplodeShot
+          ldx CURRENT_INDEX
+          lda #TYPE_EXPLOSION
+          jsr SetupSpriteInSlot
+
+          jsr MoveSpriteUp
+          jsr MoveSpriteUp
+          jsr MoveSpriteUp
+          jsr MoveSpriteUp
+          jmp MoveSpriteUp
+
+
+.NotColliding2
+          ldx CURRENT_INDEX
 
           lda #12
           sta PARAM2
@@ -868,27 +952,113 @@ BLOB_DELTA_Y
 
 
 
-;x = enemy index
-!zone DamageEnemy
-DamageEnemy
-          inc SPRITE_DAMAGE,x
-          ldy SPRITE_ACTIVE,x
-          lda SPRITE_DAMAGE,x
-          cmp TYPE_MAX_DAMAGE,y
-          beq .Killed
+!lzone BHBigBlob
+          inc SPRITE_ANIM_DELAY,x
+          lda SPRITE_ANIM_DELAY,x
+          and #$03
+          bne +
+          lda SPRITE_IMAGE,x
+          eor #$01
+          sta SPRITE_IMAGE,x
++
+          ;auto-remove homing state
+          lda #0
+          sta SPRITE_STATE,x
 
+          lda BIT_TABLE,x
+          and SPRITES_ENABLED
+          bne .Visible
+.SkipMove
           rts
 
-.Killed
-          jmp RemoveObject
+.Visible
+          inc SPRITE_MOVE_POS,x
+          lda SPRITE_MOVE_POS,x
+          and #$01
+          bne .SkipMove
+
+          lda SPRITE_CHAR_POS_X
+          cmp SPRITE_CHAR_POS_X,x
+          bmi .GoLeft
+          beq .Blocked
+
+          lda SPRITE_DIRECTION,x
+          beq .LookingRAlready
+
+          lda #0
+          sta SPRITE_DIRECTION,x
+          lda #SPRITE_BIG_BLOB_L + 4
+          sta SPRITE_IMAGE,x
+          lda #SPRITE_BIG_BLOB_L + 6
+          sta SPRITE_IMAGE + 1,x
+
+.LookingRAlready
+          jmp ObjectMoveRightBlocking
+
+.GoLeft
+          lda SPRITE_DIRECTION,x
+          bne .LookingLAlready
+
+          lda #1
+          sta SPRITE_DIRECTION,x
+          lda #SPRITE_BIG_BLOB_L
+          sta SPRITE_IMAGE,x
+          lda #SPRITE_BIG_BLOB_L
+          sta SPRITE_IMAGE + 1,x
+
+.LookingLAlready
+
+
+          jmp ObjectMoveLeftBlocking
+
+.Blocked
+          rts
 
 
 
-;------------------------------------------------------------
+!lzone BHBigBlob2
+          lda SPRITE_CHAR_POS_X - 1,x
+          sta SPRITE_CHAR_POS_X,x
+          lda SPRITE_CHAR_POS_X_DELTA - 1,x
+          sta SPRITE_CHAR_POS_X_DELTA,x
+          lda SPRITE_TILE_POS_X - 1,x
+          sta SPRITE_TILE_POS_X,x
+          lda SPRITE_TILE_POS_X_DELTA - 1,x
+          sta SPRITE_TILE_POS_X_DELTA,x
+          lda SPRITE_POS_X - 1,x
+          sta SPRITE_POS_X,x
+
+          ;remove our flag
+          lda BIT_TABLE,x
+          eor #$ff
+          and SPRITE_POS_X_EXTEND
+          sta SPRITE_POS_X_EXTEND
+
+          lda BIT_TABLE - 1,x
+          and SPRITE_POS_X_EXTEND
+          beq +
+
+          ;our bit must be set
+          lda BIT_TABLE,x
+          ora SPRITE_POS_X_EXTEND
+          sta SPRITE_POS_X_EXTEND
++
+
+
+          inc SPRITE_ANIM_DELAY,x
+          lda SPRITE_ANIM_DELAY,x
+          and #$03
+          bne +
+          lda SPRITE_IMAGE,x
+          eor #$01
+          sta SPRITE_IMAGE,x
++
+          rts
+
+
+
 ;Enemy Behaviour
-;------------------------------------------------------------
-!zone ObjectControl
-ObjectControl
+!lzone ObjectControl
           ldx #0
 
 .ObjectLoop
@@ -921,13 +1091,8 @@ ObjectControl
 
 
 
-;------------------------------------------------------------
 ;check joystick (player control)
 ;state   0: normal playing
-;      129: dying animation flying up
-;      130: dying animation falling down
-;------------------------------------------------------------
-
 !lzone BHPlayer
           lda SPRITE_HIT_BACK
           beq .NoHitBack
@@ -985,6 +1150,13 @@ ObjectControl
           ldy DOOR_OPEN_POS
           lda DOOR_TOP_TILES,y
           sta PARAM3
+
+          cpy #0
+          bne +
+
+          ldy #SFX_DOOR
+          jsr PlaySoundEffect
++
 
           ldx OPEN_DOOR_X_POS
           ldy #4
@@ -1150,13 +1322,25 @@ ObjectControl
           sta SPRITE_IMAGE + 1
           inc SPRITE_IMAGE + 1
 
-          dec PLAYER_HEALTH
+          lda PLAYER_HEALTH
+          sec
+          sbc #10
+          sta PLAYER_HEALTH
+
+          ldy #SFX_HURT
+          jsr PlaySoundEffect
+
+          ldx #10
 
           lda #<( SCREEN_PANEL_POS + $9a )
           sta ZEROPAGE_POINTER_1
           lda #>( SCREEN_PANEL_POS + $9a )
           sta ZEROPAGE_POINTER_1 + 1
+-
           jsr DecreaseValue
+
+          dex
+          bne -
 
           rts
 
@@ -1184,7 +1368,16 @@ ObjectControl
           ;no energy
           lda PLAYER_ENERGY
           ora PLAYER_ENERGY + 1
-          beq +
+          bne .HasEnergy
+
+          ldy #SFX_GUN_EMPTY
+          jsr PlaySoundEffect
+          ldx #0
+          jmp +
+
+.HasEnergy
+          jsr FindEmptySpriteSlot
+          beq .NoFreeSlot
 
           lda PLAYER_ENERGY
           sec
@@ -1226,16 +1419,19 @@ ObjectControl
 .NotKneeling
           lda #TYPE_PLAYER_SHOT
           sta PARAM3
-          jsr SpawnObject
+          jsr SpawnObjectInSlot
 
           lda SPRITE_DIRECTION
           sta SPRITE_DIRECTION,x
           lda SPRITE_TILE_POS_X_DELTA
           sta SPRITE_TILE_POS_X_DELTA,x
 
+          ldy #SFX_SHOOT
+          jsr PlaySoundEffect
+
           ldx #0
 
-
+.NoFreeSlot
 +
           ;toggle items (space)
           lda PRESSED_KEY
@@ -1259,6 +1455,9 @@ ObjectControl
           lda #0
           sta PLAYER_CARRIES_GUN
 
+          ldy #SFX_BLIP
+          jsr PlaySoundEffect
+
           lda ACTIVE_ITEM
           cmp #ITEM_PISTOL
           bne +
@@ -1266,6 +1465,7 @@ ObjectControl
           lda #16
           sta PLAYER_CARRIES_GUN
 +
+
           ldx #0
           stx CURRENT_INDEX
 
@@ -1526,6 +1726,9 @@ PLAYER_SPRITE_KNEEL
           sta SCREEN_PANEL_POS + $112 + 1
           sta SCREEN_PANEL_POS + $112 + 2
 
+          ldy #SFX_CHARGE
+          jsr PlaySoundEffect
+
           lda #TEXT_CHARGED
           jmp AddText
 
@@ -1537,8 +1740,19 @@ PLAYER_SPRITE_KNEEL
 
 
 !lzone NavCom
+          ldy #SFX_COMPUTER
+          jsr PlaySoundEffect
+
           ldy PLAYER_MAP_OBJECT
           lda MAP_OBJECT_CONTENT,y
+          cmp #11
+          bne +
+
+          lda #1
+          sta GAME_KNOW_ABOUT_BIO_LAB_DOORS
+          lda #11
+
++
           jmp AddText
 
 
@@ -1548,7 +1762,85 @@ PLAYER_SPRITE_KNEEL
           jmp HandleElevator
 
 
+
+!lzone ControlPanel
+          ldy #SFX_COMPUTER
+          jsr PlaySoundEffect
+
+          lda GAME_KNOW_ABOUT_BIO_LAB_DOORS
+          bne .Know
+
+          lda #TEXT_OVERRIDE
+          jmp AddText
+
+
+.Know
+          ldy PLAYER_MAP_OBJECT
+          lda MAP_OBJECT_CONTENT,y
+          tay
+          lda UNLOCKED_DOOR,y
+          bne .AlreadyUnlocked
+
+          lda #1
+          sta UNLOCKED_DOOR,y
+
+          ;the bio lab door?
+          cpy #5
+          bne .AlreadyUnlocked
+
+          inc GAME_PROGRESS
+
+.AlreadyUnlocked
+          lda #TEXT_UNLOCKED
+          jmp AddText
+
+
+
+!lzone ControlPanelBridge
+          ldy #SFX_COMPUTER
+          jsr PlaySoundEffect
+
+          lda UNLOCKED_DOOR + 7
+          bne .AlreadyUnlocked
+
+          ;unlock escape pods
+          lda #1
+          sta UNLOCKED_DOOR + 7
+
+          inc GAME_PROGRESS
+
+.AlreadyUnlocked
+          ldy PLAYER_MAP_OBJECT
+          lda MAP_OBJECT_CONTENT,y
+          jmp AddText
+
+
+
+!lzone EscapePod
+          lda ACTIVE_ITEM
+          cmp #ITEM_NONE
+          bne +
+
+          lda #TEXT_DOOR_LOCKED
+          jmp AddText
++
+          cmp #ITEM_CROWBAR
+          bne +
+
+          lda #1
+          sta GAME_COMPLETED
+          lda #TEXT_POD_OPEN
+          jmp AddText
+
++
+          lda #TEXT_DOESNT_WORK
+          jmp AddText
+
+
 !lzone PlayerSearchObject
+          ldy #SFX_SEARCH
+          jsr PlaySoundEffect
+
           ldy PLAYER_MAP_OBJECT
           lda MAP_OBJECT_CONTENT,y
           beq .Empty
@@ -1564,6 +1856,10 @@ PLAYER_SPRITE_KNEEL
           beq .Gun
           cpy #ITEM_KEYCARD_2
           beq .Keycard
+          cpy #ITEM_KEYCARD_BRIDGE
+          beq .KeycardBridge
+          cpy #ITEM_CROWBAR
+          beq .Crowbar
 
           jmp .Empty
 
@@ -1580,6 +1876,20 @@ PLAYER_SPRITE_KNEEL
           jsr DisplayInventory
 
           lda #TEXT_FOUND_KEYCARD_2
+          jmp AddText
+
+.Crowbar
+          jsr DisplayInventory
+
+          lda #TEXT_FOUND_CROWBAR
+          jmp AddText
+
+.KeycardBridge
+          jsr DisplayInventory
+
+          inc GAME_PROGRESS
+
+          lda #TEXT_FOUND_KEYCARD_BRIDGE
           jmp AddText
 
 .Empty
@@ -1602,7 +1912,7 @@ PLAYER_HITBACK_SPRITE
 
 
 ;check enemy collision with current object (CURRENT_INDEX)
-;return carry set if collided, y = other object index
+;return carry set if collided, y/CURRENT_SUB_INDEX = other object index
 !zone CheckCollisions
 CheckCollisions
           ldx #0
@@ -1620,6 +1930,7 @@ CheckCollisions
 
 .NextObject
           lda CURRENT_SUB_INDEX
+          tax
           clc
           adc SPRITE_COUNT,x
           tax
@@ -1748,14 +2059,12 @@ IsObjectCollidingWithObject
 
 
 
-;------------------------------------------------------------
 ;x is sprite slot
 ;PARAM1 is X
 ;PARAM2 is Y
 ;PARAM3 is object type
 ;PARAM4 = color
-;expects #1 in A to add object, #0 does not add
-;------------------------------------------------------------
+;returns #1 in A if object added, #0 if all slots were full
 !zone SpawnObject
 SpawnObject
           jsr FindEmptySpriteSlot
@@ -1836,6 +2145,9 @@ SetupSpriteInSlot
 
           lda TYPE_START_HEIGHT,y
           sta SPRITE_HEIGHT_CHARS,x
+
+          lda TYPE_START_HP,y
+          sta SPRITE_HP,x
 
           lda TYPE_START_DELTA_Y,y
           sta PARAM10
@@ -1935,15 +2247,13 @@ SetupSpriteInSlot
 .SetDirY
           sta SPRITE_DIRECTION_Y,x
 
+          lda #1
           rts
 
 
 
-;------------------------------------------------------------
 ;Removed object from array
 ;X = index of object
-;------------------------------------------------------------
-
 !lzone RemoveObject
           ;remove from array
           lda #0
@@ -1963,6 +2273,8 @@ SetupSpriteInSlot
 ;#1 in A when empty slot found, #0 when full
 FindEmptySpriteSlot
           ldx #0
+;Looks for an empty sprite slot, returns in X
+;#1 in A when empty slot found, #0 when full
 FindEmptySpriteSlotWithStartingX
 
 .CheckSlot
@@ -2043,6 +2355,10 @@ SPRITE_MAIN_INDEX
           !fill 8
 SPRITE_COUNT
           !fill 8,1
+SPRITE_HP
+          !fill 8,1
+SPRITE_VALUE
+          !fill 8
 
 
 TYPE_START_SPRITE = * - 1
@@ -2051,6 +2367,8 @@ TYPE_START_SPRITE = * - 1
           !byte SPRITE_PLAYER_SHOT
           !byte SPRITE_EXPLOSION
           !byte SPRITE_BLOB
+          !byte SPRITE_BIG_BLOB_L
+          !byte SPRITE_BIG_BLOB_L + 2
 
 TYPE_START_COLOR = * - 1
           !byte $86       ;player top
@@ -2058,13 +2376,17 @@ TYPE_START_COLOR = * - 1
           !byte $01       ;player shot
           !byte $81       ;explosion
           !byte 0         ;blob
+          !byte 0     ;big blob
+          !byte 0     ;big blob bottom
 
-TYPE_MAX_DAMAGE
-          !byte 5   ;player top
-          !byte 5   ;player bot
-          !byte 1   ;player shot
-          !byte 0   ;explosion
-          !byte 0     ;blob
+TYPE_START_HP = * - 1
+          !byte 5     ;player top
+          !byte 5     ;player bot
+          !byte 1     ;player shot
+          !byte 0     ;explosion
+          !byte 1     ;blob
+          !byte 10     ;big blob
+          !byte 10     ;big blob bottom
 
 
 ; 0 : no enemy
@@ -2077,6 +2399,8 @@ TYPE_IS_ENEMY = * - 1
           !byte 3     ;player shot
           !byte 0     ;explosion
           !byte 1     ;blob
+          !byte 1     ;big blob
+          !byte 1     ;big blob bottom
 
 ;enemy start direction, 2 bits per dir.
 ;        NXYmyyxx
@@ -2101,6 +2425,8 @@ TYPE_START_FLAGS = * - 1
           !byte 0     ;player shot
           !byte 0     ;explosion
           !byte 0     ;blob
+          !byte 1     ;big blob
+          !byte 1     ;big blob bottom
 
 TYPE_START_STATE = * - 1
           !byte 0     ;player
@@ -2108,6 +2434,8 @@ TYPE_START_STATE = * - 1
           !byte 0     ;player shot
           !byte 0     ;explosion
           !byte 0     ;blob
+          !byte 0     ;big blob
+          !byte 0     ;big blob bottom
 
 TYPE_START_DELTA_Y = * - 1
           !byte 0     ;player
@@ -2115,6 +2443,8 @@ TYPE_START_DELTA_Y = * - 1
           !byte 0     ;player shot
           !byte 0     ;explosion
           !byte 0     ;blob
+          !byte 0     ;big blob
+          !byte 3     ;big blob bot
 
 TYPE_START_HEIGHT = * - 1
           !byte 5     ;player
@@ -2122,6 +2452,9 @@ TYPE_START_HEIGHT = * - 1
           !byte 1     ;player shot
           !byte 0     ;explosion
           !byte 2     ;blob
+          !byte 5     ;big blob
+          !byte 2     ;big blob bottom
+
 
 
 

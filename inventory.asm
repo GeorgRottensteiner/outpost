@@ -1,12 +1,13 @@
-NUM_KNOWN_ITEMS = 7
+NUM_KNOWN_ITEMS = 8
 
-ITEM_NONE         = 0
-ITEM_PISTOL       = 1
-ITEM_KEYCARD_1    = 2
-ITEM_KEYCARD_2    = 3
-ITEM_KEYCARD_3    = 4
-ITEM_KEYCARD_4    = 5
-ITEM_KEYCARD_BIO  = 6
+ITEM_NONE           = 0
+ITEM_PISTOL         = 1
+ITEM_KEYCARD_1      = 2
+ITEM_KEYCARD_2      = 3
+ITEM_KEYCARD_3      = 4
+ITEM_KEYCARD_4      = 5
+ITEM_KEYCARD_BRIDGE = 6
+ITEM_CROWBAR        = 7
 
 
 
@@ -272,6 +273,18 @@ TEXT_FOUND_KEYCARD_4  = 6
 TEXT_DOOR_LOCKED      = 7
 TEXT_DOESNT_WORK      = 8
 TEXT_CHARGED          = 9
+TEXT_UNLOCKED         = 13
+TEXT_FOUND_KEYCARD_BRIDGE = 17
+TEXT_BIOLABS_FOUND        = 18
+TEXT_GAME_OVER            = 19
+
+;text bridge 1 to 6 = 20 - 25
+
+TEXT_POD_OPEN           = 26
+TEXT_GAME_COMPLETED     = 27
+TEXT_FOUND_CROWBAR      = 28
+TEXT_TITLE_1            = 29
+TEXT_OVERRIDE           = 30
 
 
 TEXT_LO
@@ -287,6 +300,25 @@ TEXT_LO
           !byte <TX_CHARGED
           !byte <TX_NAVCOM1_1
           !byte <TX_NAVCOM1_2
+          !byte <TX_NAVCOM1_3
+          !byte <TX_UNLOCKED
+          !byte <TX_CONTROL_ROOM_1
+          !byte <TX_CONTROL_ROOM_2
+          !byte <TX_CONTROL_ROOM_3
+          !byte <TX_FOUND_KEYCARD_BRIDGE
+          !byte <TX_BIOLABS_FOUND
+          !byte <TX_GAME_OVER
+          !byte <TX_BRIDGE_1
+          !byte <TX_BRIDGE_2
+          !byte <TX_BRIDGE_3
+          !byte <TX_BRIDGE_4
+          !byte <TX_BRIDGE_5
+          !byte <TX_BRIDGE_6
+          !byte <TX_POD_OPEN
+          !byte <TX_GAME_COMPLETED
+          !byte <TX_FOUND_CROWBAR
+          !byte <TX_TITLE_1
+          !byte <TX_NAVCOM_OVERRIDE
 
 TEXT_HI
           !byte >TX_FOUND_PISTOL
@@ -301,6 +333,25 @@ TEXT_HI
           !byte >TX_CHARGED
           !byte >TX_NAVCOM1_1
           !byte >TX_NAVCOM1_2
+          !byte >TX_NAVCOM1_3
+          !byte >TX_UNLOCKED
+          !byte >TX_CONTROL_ROOM_1
+          !byte >TX_CONTROL_ROOM_2
+          !byte >TX_CONTROL_ROOM_3
+          !byte >TX_FOUND_KEYCARD_BRIDGE
+          !byte >TX_BIOLABS_FOUND
+          !byte >TX_GAME_OVER
+          !byte >TX_BRIDGE_1
+          !byte >TX_BRIDGE_2
+          !byte >TX_BRIDGE_3
+          !byte >TX_BRIDGE_4
+          !byte >TX_BRIDGE_5
+          !byte >TX_BRIDGE_6
+          !byte >TX_POD_OPEN
+          !byte >TX_GAME_COMPLETED
+          !byte >TX_FOUND_CROWBAR
+          !byte >TX_TITLE_1
+          !byte >TX_NAVCOM_OVERRIDE
 
 
 TX_FOUND_PISTOL
@@ -313,7 +364,7 @@ TX_INTRO
           !scr "ugh. my head!",0
 
 TX_FOUND_KEYCARD_2
-          !scr "keycard 2",0
+          !scr "you find keycard 2",0
 
 TX_DOOR_LOCKED
           !scr "it's locked!",0
@@ -337,4 +388,61 @@ TX_FOUND_KEYCARD_4
           !scr "keycard 4",0
 
 TX_NAVCOM1_2
-          !scr "we're locked in",$80,"the labs! i forgot",$80,"my keycard in",$80,"the docking bay!",0
+          !scr "the doors are",$80,"jammed! try to",$80,"override them from",$80,"the machine deck!",0
+
+TX_NAVCOM1_3
+          !scr "reactors 100%",$80,"operational",0
+
+TX_UNLOCKED
+          !scr "unlocked the bio",$80,"lab doors",0
+
+TX_CONTROL_ROOM_1
+          !scr "the auto pilot.",$80,"i better not mess",$80,"with that.",0
+
+TX_CONTROL_ROOM_2
+          !scr "life support system",$80,"i better not mess",$80,"with that.",0
+
+TX_CONTROL_ROOM_3
+          !scr "reactor controls.",$80,"i better not mess",$80,"with them.",0
+
+TX_FOUND_KEYCARD_BRIDGE
+          !scr "you find the",$80,"keycard for the",$80,"bridge.",0
+
+TX_BIOLABS_FOUND
+          !scr "jenna! it's alive!",$80,"you have to self",$80,"destruct the ship.",$80,"the keycard...",0
+
+TX_GAME_OVER
+          !scr "life signs depleted.",0
+
+TX_BRIDGE_6
+          !scr "course is set to",$80,"inner sol system",0
+
+TX_BRIDGE_5
+          !scr "arrival estimated",$80,"in 5 days",0
+
+TX_BRIDGE_4
+          !scr "crew status:",$80,"1 alive, 7 dead",0
+
+TX_BRIDGE_3
+          !scr "ship status:",$80,"hull 100%",$80,"fuel 77%",$80,"crew 12%",0
+
+TX_BRIDGE_2
+          !scr "auto pilot has",$80,"been locked",$80,"remotely.",0
+
+TX_BRIDGE_1
+          !scr "self destruct",$80,"sequence initiated.",$80,"escape pod access",$80,"locked",0
+
+TX_POD_OPEN
+          !scr "the pod doors",$80,"slide open.",0
+
+TX_GAME_COMPLETED
+          !scr "well done!",$80,"you escaped from",$80,"outpost omega 6",$80,"alive...",0
+
+TX_FOUND_CROWBAR
+          !scr "you find a crowbar",0
+
+TX_TITLE_1
+          !scr "written by georg",$80,"rottensteiner",$80,"for the retro",$80,"platform jam #5 2022",0
+
+TX_NAVCOM_OVERRIDE
+          !scr "this panel allows",$80,"overriding door",$80,"locks. no need for",$80,"that.",0

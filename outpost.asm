@@ -10,7 +10,7 @@ SCREEN_COLOR            = $d800
 CHARSET_PANEL_LOCATION  = $f000
 CHARSET_LOCATION        = $f800
 
-NUM_SPRITES             = 64
+NUM_SPRITES             = 72
 
 JOY_BUTTON  = $10
 JOY_RIGHT   = $08
@@ -54,29 +54,26 @@ CURRENT_SUB_INDEX       = $fc
 * = $0801
 
 !basic
-          lda #15
-          sta VIC.CHARSET_MULTICOLOR_1
-          lda #0
-          sta VIC.CHARSET_MULTICOLOR_2
-
-          lda #0
-          sta VIC.SPRITE_MULTICOLOR_1
-          sta VIC.BORDER_COLOR
-          lda #10
-          sta VIC.SPRITE_MULTICOLOR_2
-
-          ;bank 3
-          lda CIA2.DATA_PORT_A
-          and #$fc
-          sta CIA2.DATA_PORT_A
-
-          lda #( ( SCREEN_CHAR % 16384 ) / 1024 ) | ( ( CHARSET_LOCATION % 16384 ) / 1024 )
-          sta VIC.MEMORY_CONTROL
-
-          lda #$18
-          sta VIC.CONTROL_2
+          ;disable shift-commodore
+          lda #$80
+          sta $0291
 
           sei
+
+          ;disable NMI (plus restore)
+          lda #<NMI
+          sta $FFFA
+          lda #>NMI
+          sta $FFFb
+          lda #$00        ; stop Timer A
+          sta CIA2.CONTROL_REGISTER_B
+          sta CIA2.TIMER_A_LO_BYTE      ; set Timer A to 0, after starting
+          sta CIA2.TIMER_A_HI_BYTE      ; NMI will occur immediately
+          lda #$81
+          sta CIA2.NMI_CONTROL          ; set Timer A as source for NMI
+          lda #$01
+          sta CIA2.CONTROL_REGISTER_A
+
           lda #$34
           sta PROCESSOR_PORT
 
@@ -124,8 +121,33 @@ CURRENT_SUB_INDEX       = $fc
           cli
 
           jsr InitIrq
+          jsr ScreenOff
 
-          jmp StartGame
+          lda #15
+          sta VIC.CHARSET_MULTICOLOR_1
+          sta SID.FILTER_MODE_VOLUME
+          lda #0
+          sta VIC.CHARSET_MULTICOLOR_2
+
+          lda #0
+          sta VIC.SPRITE_MULTICOLOR_1
+          sta VIC.BORDER_COLOR
+          lda #10
+          sta VIC.SPRITE_MULTICOLOR_2
+
+          ;bank 3
+          lda CIA2.DATA_PORT_A
+          and #$fc
+          sta CIA2.DATA_PORT_A
+
+          lda #( ( SCREEN_CHAR % 16384 ) / 1024 ) | ( ( CHARSET_LOCATION % 16384 ) / 1024 )
+          sta VIC.MEMORY_CONTROL
+
+          lda #$18
+          sta VIC.CONTROL_2
+
+          jmp Title
+          ;jmp StartGame
 
 
 !src "game.asm"
@@ -133,6 +155,12 @@ CURRENT_SUB_INDEX       = $fc
 !src "irq.asm"
 !src "objects.asm"
 !src "inventory.asm"
+!src "sfxplay.asm"
+!src "title.asm"
+
+
+NMI
+          rti
 
 
           !mediasrc "outpost.mapproject",MAP_,MAPVERTICALTILE
