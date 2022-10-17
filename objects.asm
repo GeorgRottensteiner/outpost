@@ -1003,7 +1003,7 @@ BLOB_DELTA_Y
           sta SPRITE_DIRECTION,x
           lda #SPRITE_BIG_BLOB_L
           sta SPRITE_IMAGE,x
-          lda #SPRITE_BIG_BLOB_L
+          lda #SPRITE_BIG_BLOB_L + 2
           sta SPRITE_IMAGE + 1,x
 
 .LookingLAlready
